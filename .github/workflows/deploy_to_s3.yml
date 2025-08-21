@@ -1,0 +1,60 @@
+name: Deploy ES Build index.html + bundle.js to S3
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "aws/**"
+      - ".github/workflows/terraform.yml"
+  # Uncomment the following lines to enable pull request workflows
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "aws/**"
+
+permissions:
+  id-token: write # Required for AWS OIDC
+  contents: read # Required to checkout the repo
+  pull-requests: write # Required to comment on PRs with the terraform plan
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: .
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@main
+        with:
+          role-to-assume: arn:aws:iam::021874127869:role/github-actions-oidc-role
+          aws-region: us-east-1
+          unset-current-credentials: true
+
+      - name: Deploy to S3
+        uses: jakejarvis/s3-sync-action@0.5.0
+        with:
+          args: --acl public-read --follow-symlinks --delete
+        env:
+          AWS_S3_BUCKET: "cookson.pro" # replace with bucket name var
+          SOURCE_DIR: ./dist

@@ -1,0 +1,33 @@
+{
+  "name": "my-esbuild-mui-app",
+  "version": "1.0.0",
+  "description": "A React project with esbuild, Material-UI, and React Query.",
+  "type": "module",
+  "scripts": {
+    "start": "node build.js --watch",
+    "build": "node build.js --production",
+    "dev": "node build.js --watch"
+  },
+  "keywords": [
+    "react",
+    "esbuild",
+    "material-ui",
+    "react-query",
+    "static"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.1",
+    "@mui/material": "^7.3.1",
+    "@tanstack/react-query": "^5.85.5",
+    "color-thief-react": "^2.1.0",
+    "esbuild": "0.25.9",
+    "express": "^5",
+    "http-proxy-middleware": "3.0.5",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  }
+}
