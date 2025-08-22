@@ -54,9 +54,10 @@ jobs:
           unset-current-credentials: true
 
       - name: Deploy to S3
-        uses: jakejarvis/s3-sync-action@0.5.1
+        uses: jakejarvis/s3-sync-action@master
         with:
           args: --acl public-read --follow-symlinks --delete
         env:
           AWS_S3_BUCKET: "cookson.pro" # replace with bucket name var
+          AWS_REGION: "us-east-1"
           SOURCE_DIR: ./dist
