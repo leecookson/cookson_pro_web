@@ -52,6 +52,7 @@ jobs:
           role-to-assume: arn:aws:iam::021874127869:role/github-actions-oidc-role
           aws-region: us-east-1
           unset-current-credentials: true
+          output-credentials: true
 
       - name: Deploy to S3
         uses: jakejarvis/s3-sync-action@master
