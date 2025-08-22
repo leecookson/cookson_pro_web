@@ -53,12 +53,6 @@ jobs:
           aws-region: us-east-1
 
       - name: Deploy to S3
-        uses: jakejarvis/s3-sync-action@master
-        with:
-          args: --acl public-read --follow-symlinks --delete
-        env:
-          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          AWS_S3_BUCKET: "cookson.pro" # replace with bucket name var
-          AWS_REGION: "us-east-1"
-          SOURCE_DIR: ./dist
+        run: |
+          aws s3 ls
+          aws s3 sync ./dist s3://cookson.pro --acl public-read --no-progress
