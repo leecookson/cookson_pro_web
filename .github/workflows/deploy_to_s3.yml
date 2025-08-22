@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - "aws/**"
-      - ".github/workflows/terraform.yml"
+      - "**"
+      - ".github/workflows/deploy_to_s3.yml"
   # Uncomment the following lines to enable pull request workflows
   # pull_request:
   #   branches:
