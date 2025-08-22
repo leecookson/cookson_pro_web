@@ -51,14 +51,14 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::021874127869:role/github-actions-oidc-role
           aws-region: us-east-1
-          unset-current-credentials: true
-          output-credentials: true
 
       - name: Deploy to S3
         uses: jakejarvis/s3-sync-action@master
         with:
           args: --acl public-read --follow-symlinks --delete
         env:
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           AWS_S3_BUCKET: "cookson.pro" # replace with bucket name var
           AWS_REGION: "us-east-1"
           SOURCE_DIR: ./dist
