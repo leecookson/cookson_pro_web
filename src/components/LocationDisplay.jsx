@@ -37,7 +37,7 @@ const LocationDisplay = () => {
   const keysToSkip = ['city', 'country', 'timezone', 'status'];
 
   return (
-    <Paper elevation={3} sx={{ position: 'relative', margin: 1, padding: 2, pb: 6, maxHeight: '300px', overflowY: 'auto' }}>
+    <Paper elevation={3} sx={{ position: 'relative', margin: '8px 8px 0px 8px', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
       <Typography variant="h5" gutterBottom>
         Location
       </Typography>

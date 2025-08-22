@@ -35,14 +35,14 @@ const WeatherDisplay = () => {
   const keysToSkip = ['temp', 'feels_like'];
 
   return (
-    <Paper elevation={3} sx={{ position: 'relative', margin: 1, padding: 2, pb: 6, maxHeight: '300px', overflowY: 'auto' }}>
+    <Paper elevation={3} sx={{ position: 'relative', margin: '8px 8px 0px 8px', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
       <Typography variant="h5" gutterBottom>
         Local Weather
       </Typography>
       <List>
 
         <ListItem key={"description"} divider>
-          <ListItemText primary={"Weather"} secondary={data?.name} />
+          <ListItemText primary={"Location"} secondary={data?.name} />
         </ListItem>
         <ListItem key={"temp"} divider>
           <ListItemText primary={"Temp (C)"} secondary={data.main.temp} />

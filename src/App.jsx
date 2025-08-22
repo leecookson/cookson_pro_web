@@ -19,6 +19,11 @@ const App = () => {
         </Toolbar>
       </AppBar>
       <SlideShow />
+      <AppBar position="fixed" sx={{ top: 'auto', bottom: 0 }}>
+        <Toolbar>
+          <Typography variant="h6">Lee Cookson (<a href="mailto:lee@cookson.pro">lee@cookson.pro</a>)</Typography>
+        </Toolbar>
+      </AppBar>
     </Container>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { usePalette } from 'color-thief-react';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { grey } from '@mui/material/colors';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
 import { adjustHexColor } from '../util/color';
 
@@ -34,7 +35,7 @@ const ThemeGenerator = ({ children }) => {
           // White background for paper-like surfaces
         },
         text: {
-          primary: '#000000', // Default text color
+          primary: grey[900], // A very dark grey, but not pure black
           secondary: '#ffffff', // Secondary text color
         }
         // It's a good practice to recalculate contrast text
@@ -54,6 +55,16 @@ const ThemeGenerator = ({ children }) => {
               backgroundColor: adjustHexColor(primaryColor, 20), // Darken the icon color
             },
           },
+        },
+        MuiCssBaseline: {
+          styleOverrides: (theme) => ({
+            a: {
+              color: theme.palette.text.secondary,
+              '&:hover': {
+                filter: 'brightness(80%)',
+              },
+            },
+          }),
         },
         MuiCircularProgress: {
           styleOverrides: {

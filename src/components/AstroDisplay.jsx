@@ -60,9 +60,11 @@ const AstroDisplay = () => {
   if (isAstroError) {
     return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching astronomical data: {astroError?.message}</Alert></Container>;
   }
+  const type = astroData?.data?.[0]?.type?.name;
+  const subType = astroData?.data?.[0]?.type?.subtype;
 
   return (
-    <Paper elevation={3} sx={{ position: 'relative', margin: 1, padding: 2, pb: 6, maxHeight: '300px', overflowY: 'auto' }}>
+    <Paper elevation={3} sx={{ position: 'relative', margin: '8px 8px 0px 8px', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
       <Typography variant="h5" gutterBottom>
         Zenith
       </Typography>
@@ -76,7 +78,7 @@ const AstroDisplay = () => {
           } />
         </ListItem>
         <ListItem key={"type"} divider>
-          <ListItemText primary={"Type"} secondary={astroData?.data?.[0]?.type?.name} />
+          <ListItemText primary={"Type"} secondary={type + (subType ? ` (${subType})` : '')} />
         </ListItem>
         <ListItem key={"constellation_name"} divider>
           <ListItemText primary={"Constellation"} secondary={astroData?.data[0]?.position?.constellation?.name} />
