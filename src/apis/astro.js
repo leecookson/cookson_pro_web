@@ -14,6 +14,10 @@ export const fetchAstroData = async (latitude, longitude) => {
     const errorJSON = await response.json();
     throw new Error(`Network response was not ok: ${errorJSON.error}`);
   }
-  return response.json();
+  let jsonData = await response.json();
+  if (jsonData?.data?.[0]?.name === 'Sol') {
+    jsonData.data = jsonData.data.slice(1); // remove Sun entry
+  }
+  return jsonData;
 };
 

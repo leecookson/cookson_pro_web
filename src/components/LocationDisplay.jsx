@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLocation } from '../apis/location';
+import { sigDigits } from '../util/labels';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import {
@@ -58,7 +59,7 @@ const LocationDisplay = () => {
             .filter((key) => !keysToSkip.includes(key))
             .map((key) => (
               <ListItem key={key} divider>
-                <ListItemText primary={toLabelCase(key)} secondary={data[key]} />
+                <ListItemText primary={toLabelCase(key)} secondary={sigDigits(data[key], 4)} />
               </ListItem>
             ))}
 

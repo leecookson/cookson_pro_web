@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchWeather } from '../apis/weather';
+import { sigDigits } from '../util/labels';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import {
@@ -56,7 +57,7 @@ const WeatherDisplay = () => {
             .filter((key) => !keysToSkip.includes(key))
             .map((key) => (
               <ListItem key={key} divider>
-                <ListItemText primary={toLabelCase(key)} secondary={data.main[key]} />
+                <ListItemText primary={toLabelCase(key)} secondary={sigDigits(data.main[key], 4)} />
               </ListItem>
             ))}
       </List>

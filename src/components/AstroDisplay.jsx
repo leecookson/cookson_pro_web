@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAstroData } from '../apis/astro';
 import { fetchLocation } from '../apis/location';
+import { sigDigits } from '../util/labels';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import {
@@ -60,20 +61,23 @@ const AstroDisplay = () => {
   if (isAstroError) {
     return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching astronomical data: {astroError?.message}</Alert></Container>;
   }
-  const type = astroData?.data?.[0]?.type?.name;
-  const subType = astroData?.data?.[0]?.type?.subtype;
+  const type = astroData.data?.[0]?.type?.name;
+  const subType = astroData.data?.[0]?.type?.subtype;
 
   return (
     <Paper elevation={3} sx={{ position: 'relative', margin: '8px 8px 0px 8px', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
       <Typography variant="h5" gutterBottom>
         Zenith
+        <Typography component="span" variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
+          - RA {sigDigits(astroData?.query.ra)} - Dec {sigDigits(astroData?.query.dec)}
+        </Typography>
       </Typography>
       <List>
 
         <ListItem key={"name"} divider>
           <ListItemText primary={"Name"} secondary={
-            <a href={`https://science.nasa.gov/?search=${astroData?.data?.[0]?.name}`} target="_blank" rel="noopener noreferrer">
-              {astroData?.data?.[0]?.name}
+            <a href={`https://science.nasa.gov/?search=${astroData.data?.[0]?.name}`} target="_blank" rel="noopener noreferrer">
+              {astroData.data?.[0]?.name}
             </a>
           } />
         </ListItem>
@@ -81,9 +85,9 @@ const AstroDisplay = () => {
           <ListItemText primary={"Type"} secondary={type + (subType ? ` (${subType})` : '')} />
         </ListItem>
         <ListItem key={"constellation_name"} divider>
-          <ListItemText primary={"Constellation"} secondary={astroData?.data[0]?.position?.constellation?.name} />
+          <ListItemText primary={"Constellation"} secondary={astroData.data?.[0]?.position?.constellation?.name} />
         </ListItem>
-        {showMore && astroData?.data?.[0]?.position && (
+        {showMore && astroData.data?.[0]?.position && (
           <>
             {astroData.data[0].position.equatorial && Object.entries(astroData.data[0].position.equatorial).map(([key, value]) => (
               <ListItem key={`eq-${key}`} divider>

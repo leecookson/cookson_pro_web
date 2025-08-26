@@ -19,3 +19,18 @@ export const toLabelCase = (inputString) => {
       .trim(); // Remove any leading space if the original string started with a capital
   }
 };
+
+// Formats a number to a string with significant digits
+export const sigDigits = (value, sigDigits = 3) => {
+  if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+    if (typeof value === 'string') {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && isFinite(numValue)) {
+        return Number(numValue.toPrecision(sigDigits));
+      }
+    }
+    return value;
+  } else {
+    return Number(value.toPrecision(sigDigits));
+  }
+}
