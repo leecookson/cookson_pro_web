@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAstroData } from '../apis/astro';
+import { fetchAstroData, fetchStarChartUrl } from '../apis/astro';
 import { fetchLocation } from '../apis/location';
 import { sigDigits } from '../util/labels';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -32,6 +32,7 @@ const AstroDisplay = () => {
   });
 
   const [showMore, setShowMore] = useState(false);
+  const [skyChartVisible, setSkyChartVisible] = useState(false);
 
   const latitude = locationData?.lat;
   const longitude = locationData?.lon;
@@ -40,14 +41,28 @@ const AstroDisplay = () => {
     data: astroData,
     error: astroError,
     isLoading: isAstroLoading,
-    isError: isAstroError,
+    isError: isAstroError
   } = useQuery({
     // The query key now includes latitude and longitude.
     // This is important for caching and re-fetching when the location changes.
     queryKey: ['astro', latitude, longitude],
     queryFn: () => fetchAstroData(latitude, longitude),
     // The `enabled` option ensures this query only runs when latitude and longitude are available.
-    enabled: !!(latitude && longitude),
+    enabled: !!(latitude && longitude)
+  });
+
+  const {
+    data: skyData,
+    error: skyError,
+    refetch: refetchStarChart,
+    isLoading: isSkyLoading,
+    isError: isSkyError,
+  } = useQuery({
+    // The query key now includes latitude and longitude.
+    // This is important for caching and re-fetching when the location changes.
+    queryKey: ['sky', latitude, longitude],
+    queryFn: () => fetchStarChartUrl(latitude, longitude),
+    enabled: false, // Disable automatic fetching
   });
 
   if (isLocationLoading || isAstroLoading) {
@@ -60,6 +75,9 @@ const AstroDisplay = () => {
 
   if (isAstroError) {
     return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching astronomical data: {astroError?.message}</Alert></Container>;
+  }
+  if (isSkyError) {
+    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching sky chart data: {skyError?.message}</Alert></Container>;
   }
   const type = astroData.data?.[0]?.type?.name;
   const subType = astroData.data?.[0]?.type?.subtype;
@@ -76,7 +94,7 @@ const AstroDisplay = () => {
 
         <ListItem key={"name"} divider>
           <ListItemText primary={"Name"} secondary={
-            <a href={`https://science.nasa.gov/?search=${astroData.data?.[0]?.name}`} target="_blank" rel="noopener noreferrer">
+            <a href={astroData.data?.[0]?.link ? astroData.data?.[0]?.link : `https://science.nasa.gov/?search=${astroData.data?.[0]?.name}`} target="_blank" rel="noopener noreferrer">
               {astroData.data?.[0]?.name}
             </a>
           } />
@@ -99,15 +117,58 @@ const AstroDisplay = () => {
                 <ListItemText primary={toLabelCase(key)} secondary={`${Object.values(value)[0]}°`} />
               </ListItem>
             ))}
+            <ListItem>
+              <ListItemText
+                primary={"Sky Chart"}
+                secondary={
+                  isSkyLoading ? (
+                    <CircularProgress size={20} />
+                  ) : (
+                    <a href="#" onClick={(e) => { e.preventDefault(); refetchStarChart(); setSkyChartVisible(true); }} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+                      View Star Chart
+                    </a>
+                  )
+                } />
+            </ListItem>
           </>
         )}
-
       </List>
       <Box sx={{ position: 'absolute', bottom: 0, right: 8 }}>
         <IconButton onClick={() => setShowMore(!showMore)} size="small">
           {showMore ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         </IconButton>
       </Box>
+      {skyData && skyChartVisible && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '95vw',
+            height: '95vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            p: 2,
+            boxSizing: 'border-box',
+          }}
+          onClick={() => {
+            // Optionally, add a state to control the visibility of this overlay
+            // For now, clicking anywhere on the overlay closes it.
+            // You might want a dedicated close button.
+            setSkyChartVisible(false);
+          }}
+        >
+          <div style={{ position: 'absolute', top: '5%', left: '5%', right: '5%', bottom: '5%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <img src={skyData.imageUrl}
+              alt="A placeholder image with text"
+              style={{ width: '400%', height: '400%', objectFit: 'cover', transform: 'scale(1)', objectPosition: 'center' }} />
+          </div>
+        </Box>
+      )}
     </Paper>
   );
 };
