@@ -76,9 +76,6 @@ const AstroDisplay = () => {
   if (isAstroError) {
     return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching astronomical data: {astroError?.message}</Alert></Container>;
   }
-  if (isSkyError) {
-    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching sky chart data: {skyError?.message}</Alert></Container>;
-  }
   const type = astroData.data?.[0]?.type?.name;
   const subType = astroData.data?.[0]?.type?.subtype;
 
@@ -123,6 +120,8 @@ const AstroDisplay = () => {
                 secondary={
                   isSkyLoading ? (
                     <CircularProgress size={20} />
+                  ) : skyError ? (
+                    <Alert severity="error">Error fetching sky chart data: {skyError?.message}</Alert>
                   ) : (
                     <a href="#" onClick={(e) => { e.preventDefault(); refetchStarChart(); setSkyChartVisible(true); }} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
                       View Star Chart
