@@ -132,7 +132,7 @@ const AstroDisplay = () => {
           </>
         )}
       </List>
-      <Box sx={{ position: 'absolute', bottom: 0, right: 8 }}>
+      <Box sx={{ position: 'absolute', bottom: 8, right: 8 }}>
         <IconButton onClick={() => setShowMore(!showMore)} size="small">
           {showMore ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         </IconButton>

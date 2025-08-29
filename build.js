@@ -57,7 +57,7 @@ async function startDevServer() {
 
   const app = express();
   const devServerPort = 443; // Default port for HTTPS
-  const targetApiUrl = 'http://localhost:3000'; // Target for proxying
+  const targetApiUrl = 'http://localhost:3333'; // Target for proxying
   const pywebApiUrl = 'http://localhost:8000' // Python API engine
 
   // Serve static files from 'dist' directory
