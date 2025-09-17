@@ -13,11 +13,13 @@ const App = () => {
   return (
     <Container>
       <CssBaseline />
-      <AppBar position="static">
+      <AppBar position="fixed" sx={{ top: 0, bottom: 'auto' }}>
         <Toolbar>
           <Typography variant="h6">CooksonPro</Typography>
         </Toolbar>
       </AppBar>
+      // creates empty space so SlideShow doesn't appear behind the top AppBar
+      <Toolbar />
       <SlideShow />
       <AppBar position="fixed" sx={{ top: 'auto', bottom: 0 }}>
         <Toolbar>
