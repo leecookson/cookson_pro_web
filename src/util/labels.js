@@ -23,7 +23,7 @@ export const toLabelCase = (inputString) => {
 // Formats a number to a string with significant digits
 export const sigDigits = (value, sigDigits = 3) => {
   if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
-    if (typeof value === 'string') {
+    if (typeof value === 'string' && value[0] !== '0') {
       const numValue = parseFloat(value);
       if (!isNaN(numValue) && isFinite(numValue)) {
         return Number(numValue.toPrecision(sigDigits));
