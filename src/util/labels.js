@@ -23,6 +23,8 @@ export const toLabelCase = (inputString) => {
 // Formats a number to a string with significant digits
 export const sigDigits = (value, sigDigits = 3) => {
   if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+    // leading zero string that's a number may be a zip code
+    // should detect "0.01" though
     if (typeof value === 'string' && value[0] !== '0') {
       const numValue = parseFloat(value);
       if (!isNaN(numValue) && isFinite(numValue)) {
