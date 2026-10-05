@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchTonight } from '../apis/astro';
 import { fetchLocation } from '../apis/location';
 import { toLabelCase } from '../util/labels';
 import { useExpandScroll } from '../util/useExpandScroll';
+import SkyView from './SkyView';
+import ExploreIcon from '@mui/icons-material/Explore';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import {
@@ -138,8 +141,8 @@ const cloudsValue = ({ meanCover, minCover, maxCover, clearest }) => {
   return clearest ? `${range} · clearest ${formatTime(clearest.time)}` : range;
 };
 
-const Row = ({ label, value }) => (
-  <ListItem disableGutters dense divider>
+const Row = ({ label, value, action }) => (
+  <ListItem disableGutters dense divider secondaryAction={action}>
     <ListItemText primary={label} secondary={value} />
   </ListItem>
 );
@@ -178,11 +181,13 @@ const NightSkyDisplay = () => {
   });
 
   const { showMore, toggleShowMore, panelRef } = useExpandScroll();
+  // null when closed, otherwise { focusId } (focusId null for no particular object)
+  const [skyView, setSkyView] = useState(null);
 
   const latitude = locationData?.lat;
   const longitude = locationData?.lon;
 
-  const { data, error, isLoading, isError } = useQuery({
+  const { data, error, isLoading, isError, dataUpdatedAt } = useQuery({
     queryKey: ['tonight', latitude, longitude],
     queryFn: () => fetchTonight(latitude, longitude),
     enabled: !!(latitude && longitude),
@@ -243,7 +248,16 @@ const NightSkyDisplay = () => {
           )}
           <Row label="Moon" value={moonValue(moon, moonWhen)} />
           {planets.map((p) => (
-            <Row key={p.id} label={p.name} value={planetValue(p, viewWindow)} />
+            <Row
+              key={p.id}
+              label={p.name}
+              value={planetValue(p, viewWindow)}
+              action={(
+                <IconButton edge="end" size="small" aria-label={`View ${p.name} in the sky`} title="Show in sky view"
+                  onClick={() => setSkyView({ focusId: p.id })}>
+                  <ExploreIcon fontSize="small" />
+                </IconButton>
+              )} />
           ))}
           {passes.map((p) => (
             <Row key={`${p.id}-${p.start.time}`} label={`${objectLabel(p.id)} pass`} value={passValue(p)} />
@@ -274,6 +288,23 @@ const NightSkyDisplay = () => {
           </>
         )}
       </Paper>
+      {viewWindow && (
+        <>
+          <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
+            <IconButton onClick={() => setSkyView({ focusId: null })} size="small" aria-label="Open sky view" title="Sky view">
+              <ExploreIcon />
+            </IconButton>
+          </Box>
+          <SkyView
+            open={!!skyView}
+            onClose={() => setSkyView(null)}
+            focusId={skyView?.focusId}
+            data={data}
+            latitude={latitude}
+            longitude={longitude}
+            anchorTime={dataUpdatedAt} />
+        </>
+      )}
       {/* Pass rows can overflow the card even without hourly detail, so expand is always offered */}
       {status === 'ok' && (
         <Box sx={{ position: 'absolute', bottom: 8, right: 8 }}>
