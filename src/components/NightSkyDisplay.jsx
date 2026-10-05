@@ -55,6 +55,29 @@ const passValue = ({ start, peak, endsInShadow, durationSeconds }) => {
   return `${formatTime(start.time)} · ${toCompass(start.azimuth)} → ${Math.round(peak.altitude)}° ${toCompass(peak.azimuth)} · ${ending}, ${formatDuration(durationSeconds)}`;
 };
 
+// "from 7:41 PM · highest 52° SSE · mag 0.2 in Cetus". start/end are clipped to
+// the window, so matching a window edge means it's up when the window opens or still up at midnight.
+const planetValue = ({ start, peak, end, magnitude, constellation }, viewWindow) => {
+  const upAtStart = start.time === viewWindow.start;
+  const upAtEnd = end.time === viewWindow.end;
+  const when = upAtStart && upAtEnd ? 'up all evening'
+    : upAtStart ? `until ${formatTime(end.time)}`
+      : upAtEnd ? `from ${formatTime(start.time)}`
+        : `${formatTime(start.time)} – ${formatTime(end.time)}`;
+  const where = `highest ${Math.round(peak.altitude)}° ${toCompass(peak.azimuth)}`;
+  const brightness = magnitude != null ? `mag ${magnitude.toFixed(1)}${constellation ? ` in ${constellation}` : ''}` : constellation;
+  return [when, where, brightness].filter(Boolean).join(' · ');
+};
+
+// window.darkness/darkest are newer than the rest of the API; fall back to the sun's twilight times
+const darkSkyValue = (viewWindow, sun) => {
+  const fullyDark = viewWindow.darkness ? viewWindow.darkness.astronomical : sun.twilight?.astronomical?.end;
+  const darkest = viewWindow.darkest ?? (fullyDark ? 'astronomical' : null);
+  if (darkest === 'astronomical' && fullyDark) return `Fully dark from ${formatTime(fullyDark)}`;
+  const nautical = viewWindow.darkness?.nautical;
+  return nautical ? `Never fully dark tonight · stars from ${formatTime(nautical)}` : 'Never fully dark tonight';
+};
+
 // "7p" for the hourly cloud bars
 const formatHour = (iso) =>
   new Date(iso).toLocaleTimeString([], { hour: 'numeric' }).replace(/\s?([AP])M$/i, (_, p) => p.toLowerCase());
@@ -182,12 +205,15 @@ const NightSkyDisplay = () => {
   }
 
   const { status, reason, window: viewWindow, sun, moon, clouds, objects, unavailable } = data;
-  const darkFrom = sun.twilight?.astronomical?.end;
   const moonWhen = viewWindow && moonInWindow(moon, viewWindow);
-  // Satellites are the only kind with passes so far; other kinds are skipped until the card knows them
+  // Kinds the card doesn't know yet are skipped
   const passes = (objects ?? [])
     .filter((o) => o.kind === 'satellite')
     .flatMap((o) => (o.passes ?? []).map((p) => ({ ...p, id: o.id })));
+  // Brightest first (lower magnitude is brighter)
+  const planets = (objects ?? [])
+    .filter((o) => o.kind === 'planet')
+    .sort((a, b) => (a.magnitude ?? 99) - (b.magnitude ?? 99));
   const unavailableObjects = Object.entries(unavailable ?? {})
     .filter(([key]) => key.startsWith('objects.'))
     .map(([key, why]) => ({ id: key.slice('objects.'.length), why }));
@@ -216,6 +242,9 @@ const NightSkyDisplay = () => {
             <Row label="Clouds" value={unavailable?.clouds ?? 'Not available'} />
           )}
           <Row label="Moon" value={moonValue(moon, moonWhen)} />
+          {planets.map((p) => (
+            <Row key={p.id} label={p.name} value={planetValue(p, viewWindow)} />
+          ))}
           {passes.map((p) => (
             <Row key={`${p.id}-${p.start.time}`} label={`${objectLabel(p.id)} pass`} value={passValue(p)} />
           ))}
@@ -223,7 +252,7 @@ const NightSkyDisplay = () => {
             <Row key={id} label={objectLabel(id)} value={why} />
           ))}
           {status === 'ok' && (
-            <Row label="Dark sky" value={darkFrom ? `from ${formatTime(darkFrom)}` : 'No astronomical darkness tonight'} />
+            <Row label="Dark sky" value={darkSkyValue(viewWindow, sun)} />
           )}
         </List>
 
