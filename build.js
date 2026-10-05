@@ -83,8 +83,8 @@ async function startDevServer() {
   }));
 
   // HTTPS setup
-  const certPath = path.join(process.env.HOME, '.consumer-certs', 'consumer.crt');
-  const keyPath = path.join(process.env.HOME, '.consumer-certs', 'consumer.key');
+  const certPath = path.join(process.env.HOME, 'local-certs', 'localhost.crt');
+  const keyPath = path.join(process.env.HOME, 'local-certs', 'localhost.key');
 
   try {
     const privateKey = await fs.readFile(keyPath, 'utf8');

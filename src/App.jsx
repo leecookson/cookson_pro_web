@@ -6,21 +6,22 @@ import {
   Typography,
 } from '@mui/material';
 
-import SlideShow from './components/SlideShow.jsx';
+import CardGrid from './components/CardGrid.jsx';
 import PlatformBanner from './components/PlatformBanner.jsx';
 
 const App = () => {
   return (
-    <Container>
+    <Container maxWidth={false}>
       <CssBaseline />
       <AppBar position="fixed" sx={{ top: 0, bottom: 'auto' }}>
         <Toolbar>
           <Typography variant="h6">CooksonPro</Typography>
         </Toolbar>
       </AppBar>
-      // creates empty space so SlideShow doesn't appear behind the top AppBar
+      {/* Spacers keep the grid clear of the fixed top and bottom AppBars */}
       <Toolbar />
-      <SlideShow />
+      <CardGrid />
+      <Toolbar />
       <AppBar position="fixed" sx={{ top: 'auto', bottom: 0 }}>
         <Toolbar>
           <Typography variant="h6">Lee Cookson (<a href="mailto:lee@cookson.pro">lee@cookson.pro</a>)</Typography>

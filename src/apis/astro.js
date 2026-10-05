@@ -34,7 +34,44 @@ export const fetchAstroData = async (latitude, longitude) => {
   return jsonData;
 };
 
-export const fetchStarChartUrl = async (latitude, longitude) => {
+/**
+ * Fetches sun/moon rise, set, twilight and moon phase for today in the browser's time zone.
+ * See docs/api-astro-sunmoon.md for the response shape.
+ */
+export const fetchSunMoon = async (latitude, longitude) => {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const date = new Date().toLocaleDateString('en-CA', { timeZone: tz }); // en-CA formats as YYYY-MM-DD
+  const params = new URLSearchParams({ date, tz });
+  let url = `/api/v1/astro/sunmoon/${latitude}/${longitude}?${params}`;
+  console.log(`[Astro API] Fetching sun/moon data from ${url}`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    const errorJSON = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(`Network response was not ok: ${errorJSON.message}`);
+  }
+  return await response.json();
+};
+
+/**
+ * Fetches tonight's stargazing conditions (viewing window, cloud forecast, sun and moon)
+ * for today's evening in the browser's time zone.
+ * See cookson_pro_api/docs/api-astro-tonight.md for the response shape.
+ */
+export const fetchTonight = async (latitude, longitude) => {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const date = new Date().toLocaleDateString('en-CA', { timeZone: tz }); // en-CA formats as YYYY-MM-DD
+  const params = new URLSearchParams({ date, tz });
+  let url = `/api/v1/astro/tonight/${latitude}/${longitude}?${params}`;
+  console.log(`[Astro API] Fetching tonight data from ${url}`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    const errorJSON = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(`Network response was not ok: ${errorJSON.message}`);
+  }
+  return await response.json();
+};
+
+export const fetchStarChartUrl =async (latitude, longitude) => {
   let url = `/api/v1/astro/zenith/starchart/${latitude}/${longitude}?zoom=9`;
   console.log(`[Astro API] Fetching star chart from ${url}`);
   const response = await fetch(url);
