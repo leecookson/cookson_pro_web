@@ -19,6 +19,7 @@ import {
   IconButton,
 } from '@mui/material';
 import { toLabelCase } from '../util/labels';
+import { useExpandScroll } from '../util/useExpandScroll';
 
 const AstroDisplay = () => {
   const {
@@ -32,7 +33,7 @@ const AstroDisplay = () => {
     retry: 1,
   });
 
-  const [showMore, setShowMore] = useState(false);
+  const { showMore, toggleShowMore, panelRef } = useExpandScroll();
   const [skyChartVisible, setSkyChartVisible] = useState(false);
   const [skyChartZoom, setSkyChartZoom] = useState(100); // Start at 100% zoom
 
@@ -118,145 +119,147 @@ const AstroDisplay = () => {
   const subType = astroData.data?.[0]?.type?.subtype;
 
   return (
-    <Paper elevation={3} sx={{ position: 'relative', margin: '8px 8px 0px 8px', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
-      <Typography variant="h5" gutterBottom>
-        Zenith
-        <Typography component="span" variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
-          - RA {sigDigits(astroData?.query.ra)} - Dec {sigDigits(astroData?.query.dec)}
+    <Box sx={{ position: 'relative', margin: '8px 8px 0px 8px' }}>
+      <Paper ref={panelRef} elevation={3} sx={{ position: 'relative', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
+        <Typography variant="h5" gutterBottom>
+          Zenith
+          <Typography component="span" variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
+            - RA {sigDigits(astroData?.query.ra)} - Dec {sigDigits(astroData?.query.dec)}
+          </Typography>
         </Typography>
-      </Typography>
-      <List>
+        <List>
 
-        <ListItem key={"name"} divider>
-          <ListItemText primary={"Name"} secondary={
-            <a href={astroData.data?.[0]?.link ? astroData.data?.[0]?.link : `https://science.nasa.gov/?search=${astroData.data?.[0]?.name}`} target="_blank" rel="noopener noreferrer">
-              {astroData.data?.[0]?.name}
-            </a>
-          } />
-        </ListItem>
-        <ListItem key={"type"} divider>
-          <ListItemText primary={"Type"} secondary={type + (subType ? ` (${subType})` : '')} />
-        </ListItem>
-        <ListItem key={"constellation_name"} divider>
-          <ListItemText primary={"Constellation"} secondary={astroData.data?.[0]?.position?.constellation?.name} />
-        </ListItem>
-        {showMore && astroData.data?.[0]?.position && (
-          <>
-            {astroData.data[0].position.equatorial && Object.entries(astroData.data[0].position.equatorial).map(([key, value]) => (
-              <ListItem key={`eq-${key}`} divider>
-                <ListItemText primary={toLabelCase(key)} secondary={`${Object.values(value)[0]}${key === 'rightAscension' ? 'h' : '°'}`} />
+          <ListItem key={"name"} divider>
+            <ListItemText primary={"Name"} secondary={
+              <a href={astroData.data?.[0]?.link ? astroData.data?.[0]?.link : `https://science.nasa.gov/?search=${astroData.data?.[0]?.name}`} target="_blank" rel="noopener noreferrer">
+                {astroData.data?.[0]?.name}
+              </a>
+            } />
+          </ListItem>
+          <ListItem key={"type"} divider>
+            <ListItemText primary={"Type"} secondary={type + (subType ? ` (${subType})` : '')} />
+          </ListItem>
+          <ListItem key={"constellation_name"} divider>
+            <ListItemText primary={"Constellation"} secondary={astroData.data?.[0]?.position?.constellation?.name} />
+          </ListItem>
+          {showMore && astroData.data?.[0]?.position && (
+            <>
+              {astroData.data[0].position.equatorial && Object.entries(astroData.data[0].position.equatorial).map(([key, value]) => (
+                <ListItem key={`eq-${key}`} divider>
+                  <ListItemText primary={toLabelCase(key)} secondary={`${Object.values(value)[0]}${key === 'rightAscension' ? 'h' : '°'}`} />
+                </ListItem>
+              ))}
+              {astroData.data[0].position.horizontal && Object.entries(astroData.data[0].position.horizontal).map(([key, value]) => (
+                <ListItem key={`hor-${key}`} divider>
+                  <ListItemText primary={toLabelCase(key)} secondary={`${Object.values(value)[0]}°`} />
+                </ListItem>
+              ))}
+              <ListItem>
+                <ListItemText
+                  primary={"Sky Chart"}
+                  secondary={
+                    isSkyLoading ? (
+                      <CircularProgress size={20} />
+                    ) : skyError ? (
+                      <Alert severity="error">Error fetching sky chart data: {skyError?.message}</Alert>
+                    ) : (
+                      <a href="#" onClick={(e) => { e.preventDefault(); refetchStarChart(); setSkyChartVisible(true); }} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+                        View Star Chart
+                      </a>
+                    )
+                  } />
               </ListItem>
-            ))}
-            {astroData.data[0].position.horizontal && Object.entries(astroData.data[0].position.horizontal).map(([key, value]) => (
-              <ListItem key={`hor-${key}`} divider>
-                <ListItemText primary={toLabelCase(key)} secondary={`${Object.values(value)[0]}°`} />
-              </ListItem>
-            ))}
-            <ListItem>
-              <ListItemText
-                primary={"Sky Chart"}
-                secondary={
-                  isSkyLoading ? (
-                    <CircularProgress size={20} />
-                  ) : skyError ? (
-                    <Alert severity="error">Error fetching sky chart data: {skyError?.message}</Alert>
-                  ) : (
-                    <a href="#" onClick={(e) => { e.preventDefault(); refetchStarChart(); setSkyChartVisible(true); }} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-                      View Star Chart
-                    </a>
-                  )
-                } />
-            </ListItem>
-          </>
+            </>
+          )}
+        </List>
+        {skyData && skyChartVisible && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '95vw',
+              height: '95vh',
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              p: 2,
+              boxSizing: 'border-box',
+            }}
+            onClick={() => {
+              // Optionally, add a state to control the visibility of this overlay
+              // For now, clicking anywhere on the overlay closes it.
+              // You might want a dedicated close button.
+              setSkyChartVisible(false);
+            }}
+          >
+            <IconButton
+              aria-label="close"
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent the parent Box's onClick from firing
+                setSkyChartVisible(false);
+              }}
+              sx={{
+                position: 'absolute',
+                top: 8,
+                left: 8,
+                color: 'white',
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+            <div style={{ position: 'absolute', top: '5%', left: '5%', right: '5%', bottom: '5%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+              // Stop click propagation to prevent closing the modal when interacting with the image
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img src={skyData.imageUrl}
+                alt="Sky Chart"
+                style={{
+                  width: `${skyChartZoom}%`,
+                  height: `${skyChartZoom}%`,
+                  objectFit: 'cover',
+                  transform: 'scale(1)',
+                  objectPosition: 'center'
+                }}
+                onWheel={handleWheelZoom}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              />
+              {/* Cross-hair overlay */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '0',
+                right: '0',
+                height: '1px',
+                backgroundColor: 'rgba(255, 0, 0, 0.5)',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none' // Make it non-interactive
+              }} />
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: '0',
+                bottom: '0',
+                width: '1px',
+                backgroundColor: 'rgba(255, 0, 0, 0.5)',
+                transform: 'translateX(-50%)',
+                pointerEvents: 'none' // Make it non-interactive
+              }} />
+            </div>
+          </Box>
         )}
-      </List>
+      </Paper>
       <Box sx={{ position: 'absolute', bottom: 8, right: 8 }}>
-        <IconButton onClick={() => setShowMore(!showMore)} size="small">
+        <IconButton onClick={toggleShowMore} size="small">
           {showMore ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         </IconButton>
       </Box>
-      {skyData && skyChartVisible && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '95vw',
-            height: '95vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            p: 2,
-            boxSizing: 'border-box',
-          }}
-          onClick={() => {
-            // Optionally, add a state to control the visibility of this overlay
-            // For now, clicking anywhere on the overlay closes it.
-            // You might want a dedicated close button.
-            setSkyChartVisible(false);
-          }}
-        >
-          <IconButton
-            aria-label="close"
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent the parent Box's onClick from firing
-              setSkyChartVisible(false);
-            }}
-            sx={{
-              position: 'absolute',
-              top: 8,
-              left: 8,
-              color: 'white',
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
-          <div style={{ position: 'absolute', top: '5%', left: '5%', right: '5%', bottom: '5%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
-            // Stop click propagation to prevent closing the modal when interacting with the image
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img src={skyData.imageUrl}
-              alt="Sky Chart"
-              style={{
-                width: `${skyChartZoom}%`,
-                height: `${skyChartZoom}%`,
-                objectFit: 'cover',
-                transform: 'scale(1)',
-                objectPosition: 'center'
-              }}
-              onWheel={handleWheelZoom}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-            />
-            {/* Cross-hair overlay */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '0',
-              right: '0',
-              height: '1px',
-              backgroundColor: 'rgba(255, 0, 0, 0.5)',
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none' // Make it non-interactive
-            }} />
-            <div style={{
-              position: 'absolute',
-              left: '50%',
-              top: '0',
-              bottom: '0',
-              width: '1px',
-              backgroundColor: 'rgba(255, 0, 0, 0.5)',
-              transform: 'translateX(-50%)',
-              pointerEvents: 'none' // Make it non-interactive
-            }} />
-          </div>
-        </Box>
-      )}
-    </Paper>
+    </Box>
   );
 };
 
