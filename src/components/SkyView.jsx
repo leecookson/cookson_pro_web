@@ -66,7 +66,6 @@ const MIN_FOV = 20;
 const MAX_FOV = 130;
 const MIN_ALT = 0;
 const MAX_ALT = 85;
-const TRACK_STEP_MS = 5 * 60000;
 const SLIDER_STEP_MS = 5 * 60000;
 // A tap that moves less than this is a selection, not a drag
 const TAP_SLOP_PX = 6;
@@ -287,14 +286,6 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
     }
   };
 
-  // Times across the window for drawing tracks
-  const trackTimes = useMemo(() => {
-    const times = [];
-    for (let t = windowStart; t <= windowEnd; t += TRACK_STEP_MS) times.push(t);
-    if (times[times.length - 1] !== windowEnd) times.push(windowEnd);
-    return times;
-  }, [windowStart, windowEnd]);
-
   const sunAlt = bodies.sun ? bodies.sun(time).altitude : -18;
   const sky = skyColors(sunAlt);
 
@@ -359,17 +350,12 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
     .map((alt) => ({ alt, p: project({ altitude: alt, azimuth: view.azimuth }) }))
     .filter(({ p }) => p.front && p.y > 0 && p.y < height);
 
-  const tracks = [
-    ...bodies.planets.map((b) => ({ id: b.id, times: trackTimes })),
-    ...(bodies.moon ? [{ id: 'moon', times: trackTimes }] : []),
-    ...bodies.passes.map((b) => ({
-      id: b.id,
-      times: Array.from({ length: 21 }, (_, i) => b.from + ((b.to - b.from) * i) / 20),
-    })),
-  ].map(({ id, times }) => {
-    const body = [...bodies.planets, ...bodies.passes, bodies.moon].find((b) => b?.id === id);
-    const positions = times.map((t) => body.at(t)).filter(Boolean);
-    return { id, d: skyPath(positions, project, (pos) => pos.altitude > 0) };
+  // Only satellite passes get a track: they move against the background sky. Planets and
+  // the moon just turn with it over an evening, which the time slider already shows.
+  const tracks = bodies.passes.map((b) => {
+    const times = Array.from({ length: 21 }, (_, i) => b.from + ((b.to - b.from) * i) / 20);
+    const positions = times.map((t) => b.at(t)).filter(Boolean);
+    return { id: b.id, d: skyPath(positions, project, (pos) => pos.altitude > 0) };
   });
 
   const selected = placed.find((b) => b.id === selectedId)
