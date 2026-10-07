@@ -1,49 +1,61 @@
+const getJson = async (url) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const errorJSON = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(`Network response was not ok: ${errorJSON.message}`);
+  }
+  return response.json();
+};
+
+const browserPosition = () => new Promise((resolve, reject) => {
+  if (!navigator.geolocation) {
+    reject(new Error('Geolocation is not available'));
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(resolve, reject, {
+    enableHighAccuracy: true,
+    timeout: 5000,
+    maximumAge: 0,
+  });
+});
+
 /**
- * Fetches location data.
- * If an IP address is provided, it will be used for the lookup.
- * Otherwise, the server will attempt to determine location based on the client's IP.
+ * Fetches the user's location: { lat, lon, city, regionName, country, countryCode, timezone, source, ... }.
  *
- * @param {string} [ipAddress] - Optional IP address to lookup location for.
+ * Prefers the browser's geolocation, named by the server's reverse geocoding
+ * (/api/v1/location/:lat/:lon). Falls back to the server's lookup of the client's IP
+ * (/api/v1/location) when geolocation is denied, times out or isn't available.
+ * Both server responses use the same field names.
+ *
  * @returns {Promise<object>} A promise that resolves to the location data.
  */
-export const fetchLocation = async (coordsOnly) => {
-  if (navigator.geolocation) {
+export const fetchLocation = async () => {
+  let coords;
+  try {
+    const position = await browserPosition();
+    coords = { lat: position.coords.latitude, lon: position.coords.longitude };
+    console.log(`[Location API] Using browser geolocation: Latitude ${coords.lat}, Longitude ${coords.lon}`);
+  } catch (geoError) {
+    console.warn(`[Location API] Browser geolocation failed: ${geoError.message}. Falling back to IP-based location.`);
+  }
+
+  if (coords) {
+    // The device's own zone, which is what the astro cards' local times are for
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
-        });
-      });
-      const { latitude, longitude } = position.coords;
-      console.log(`[Location API] Using browser geolocation: Latitude ${latitude}, Longitude ${longitude}`);
-
-      if (coordsOnly) {
-        return { lat: latitude, lon: longitude, source: 'browser_geolocation' };
-      }
-
-    } catch (geoError) {
-      console.warn(`[Location API] Browser geolocation failed: ${geoError.message}. Falling back to IP-based location.`);
-      // Fallback to IP-based location if geolocation fails
+      const place = await getJson(`/api/v1/location/${coords.lat}/${coords.lon}`);
+      return { ...place, ...coords, timezone, source: 'browser_geolocation' };
+    } catch (placeError) {
+      // The coordinates are still right even if they can't be named
+      console.warn(`[Location API] Reverse geocoding failed: ${placeError.message}`);
+      return { ...coords, timezone, source: 'browser_geolocation' };
     }
   }
 
-  // not coordsOnly, or geolocation not available
-  let url = '/api/v1/location';
-  console.log(`[Location API] Fetching location data from ${url}: 'based on client IP'}`);
-
+  console.log('[Location API] Fetching location data from /api/v1/location based on client IP');
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      const errorJSON = await response.json();
-      throw new Error(`Network response was not ok: ${errorJSON.message}`);
-    }
-    const data = await response.json();
-    if (coordsOnly) {
-      return { lat: data.latitude, lon: data.longitude, source: 'server_ip_geolocation' };
-    }
-    return data;
+    const data = await getJson('/api/v1/location');
+    return { ...data, source: 'server_ip_geolocation' };
   } catch (netErr) {
     throw new Error(`Network error while fetching location: ${netErr.message}`);
   }

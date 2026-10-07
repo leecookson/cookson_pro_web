@@ -25,6 +25,8 @@ const COLORS = {
   moonLit: '#f1ecd8',
   moonDark: 'rgba(241, 236, 216, 0.12)',
   iss: '#8fd3ff',
+  star: '#e6ecff',
+  starLabel: 'rgba(216, 222, 234, 0.6)',
 };
 
 const PLANET_COLOR = {
@@ -77,6 +79,11 @@ const formatTime = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric'
 
 // Brighter (lower magnitude) planets get bigger dots
 const planetRadius = (magnitude) => clamp(3.5 - 0.6 * (magnitude ?? 1), 2, 6);
+// Stars are smaller than planets of the same magnitude, so planets stand out
+const starRadius = (magnitude) => clamp(2.2 - 0.5 * (magnitude ?? 1.5), 1.2, 3);
+
+// Stars come out between civil (-6°) and nautical (-12°) dusk; fade them in over that range
+const starOpacity = (sunAlt) => clamp((-6 - sunAlt) / 6, 0, 1);
 
 // Lit part of the moon as an SVG path, bright limb towards +x before rotation.
 // The terminator is a half-ellipse whose width depends on the lit fraction.
@@ -96,6 +103,16 @@ const buildBodies = (data, latitude, anchorTime) => {
     .map((o) => ({
       id: o.id,
       kind: 'planet',
+      name: o.name,
+      magnitude: o.magnitude,
+      detail: [o.magnitude != null && `mag ${o.magnitude.toFixed(1)}`, o.constellation && `in ${o.constellation}`].filter(Boolean).join(' '),
+      at: diurnalPath(o.peak, latitude),
+    }));
+  const stars = objects
+    .filter((o) => o.kind === 'star')
+    .map((o) => ({
+      id: o.id,
+      kind: 'star',
       name: o.name,
       magnitude: o.magnitude,
       detail: [o.magnitude != null && `mag ${o.magnitude.toFixed(1)}`, o.constellation && `in ${o.constellation}`].filter(Boolean).join(' '),
@@ -122,8 +139,11 @@ const buildBodies = (data, latitude, anchorTime) => {
     at: diurnalPath({ ...data.moon.position, time: anchorTime }, latitude, MOON_DEG_PER_HOUR),
   };
   const sun = data.sun?.position && diurnalPath({ ...data.sun.position, time: anchorTime }, latitude);
-  return { planets, passes, moon, sun };
+  return { planets, stars, passes, moon, sun };
 };
+
+// Everything that can be selected or followed. Stars come first so they draw underneath.
+const selectable = (bodies) => [...bodies.stars, ...bodies.planets, ...bodies.passes, ...(bodies.moon ? [bodies.moon] : [])];
 
 // Start facing the brightest planet at `time`, else the equator side of the sky
 const initialAzimuth = (bodies, time, latitude) => {
@@ -173,7 +193,7 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
   // dragging the view stops it
   const [following, setFollowing] = useState(!!focusId);
 
-  const followed = following && [...bodies.planets, ...bodies.passes, bodies.moon].find((b) => b?.id === selectedId);
+  const followed = following && selectable(bodies).find((b) => b.id === selectedId);
   const followedPos = followed && followed.at(time);
   useEffect(() => {
     if (!followedPos || view.fov === null || !width) return;
@@ -292,13 +312,14 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
   // Bodies above the horizon at `time`, with screen positions (also used for hit-testing)
   const placed = useMemo(() => {
     if (!projection) return [];
-    const all = [...bodies.planets, ...bodies.passes, ...(bodies.moon ? [bodies.moon] : [])];
-    return all
+    const starsOut = starOpacity(sunAlt) > 0;
+    return selectable(bodies)
+      .filter((b) => b.kind !== 'star' || starsOut || b.id === selectedId)
       .map((b) => ({ ...b, pos: b.at(time) }))
       .filter((b) => b.pos && b.pos.altitude > 0)
       .map((b) => ({ ...b, ...projection.project(b.pos) }))
       .filter((b) => b.front && b.x > -50 && b.x < width + 50 && b.y > -50 && b.y < height + 50);
-  }, [projection, bodies, time, width, height]);
+  }, [projection, bodies, time, width, height, sunAlt, selectedId]);
 
   // Same outer element either way, so the size observer keeps watching it
   if (!ready) {
@@ -359,7 +380,7 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
   });
 
   const selected = placed.find((b) => b.id === selectedId)
-    ?? [...bodies.planets, ...bodies.passes, bodies.moon].find((b) => b?.id === selectedId);
+    ?? selectable(bodies).find((b) => b.id === selectedId);
   const selectedPos = selected?.at(time);
 
   const sliderMarks = nowInWindow ? [{ value: now, label: 'Now' }] : [];
@@ -420,6 +441,18 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
                   <circle r={r} fill={COLORS.moonDark} />
                   <path d={moonLitPath(r, b.illumination)} fill={COLORS.moonLit} transform={`rotate(${angle})`} />
                   <text x={r + 5} y={4} fontSize={12} fill={COLORS.label}>Moon</text>
+                </g>
+              );
+            }
+            if (b.kind === 'star') {
+              const r = starRadius(b.magnitude);
+              const opacity = b.id === selectedId ? 1 : starOpacity(sunAlt);
+              if (opacity === 0) return null;
+              return (
+                <g key={b.id} transform={`translate(${b.x},${b.y})`} opacity={opacity}>
+                  <circle r={r} fill={COLORS.star} />
+                  {b.id === selectedId && <circle r={r + 6} fill="none" stroke={COLORS.label} strokeWidth={1} />}
+                  <text x={r + 4} y={3} fontSize={10} fill={COLORS.starLabel}>{b.name}</text>
                 </g>
               );
             }

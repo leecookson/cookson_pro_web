@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchWeather } from '../apis/weather';
+import { fetchLocation } from '../apis/location';
 import { sigDigits } from '../util/labels';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -18,16 +19,64 @@ import {
 import { toLabelCase } from '../util/labels';
 import { useExpandScroll } from '../util/useExpandScroll';
 
+// Kind of weather from OpenWeatherMap's condition code (weather[0].id):
+// https://openweathermap.org/weather-conditions. `night` swaps the sun for a moon when clear.
+const conditionKind = (id, night) => {
+  if (id >= 200 && id < 300) return { emoji: '⛈️', kind: 'Thunderstorm' };
+  if (id >= 300 && id < 400) return { emoji: '🌦️', kind: 'Drizzle' };
+  if (id >= 500 && id < 600) return { emoji: '🌧️', kind: 'Rain' };
+  if (id >= 600 && id < 700) return { emoji: '🌨️', kind: 'Snow' };
+  if (id === 781) return { emoji: '🌪️', kind: 'Tornado' };
+  if (id >= 700 && id < 800) return { emoji: '🌫️', kind: null }; // mist, fog, haze, smoke, dust: use OWM's own word
+  if (id === 800) return { emoji: night ? '🌙' : '☀️', kind: 'Clear' };
+  if (id === 801) return { emoji: night ? '🌙' : '🌤️', kind: 'Mostly clear' };
+  if (id === 802) return { emoji: '⛅', kind: 'Partly cloudy' };
+  if (id === 803) return { emoji: '🌥️', kind: 'Mostly cloudy' };
+  if (id === 804) return { emoji: '☁️', kind: 'Cloudy' };
+  return { emoji: '', kind: null };
+};
+
+// "🌧️ Rain · light rain". For clear and cloudy skies (800-804) the kind already says it
+// better than OWM's description ("broken clouds"), so that is left off.
+const conditionsValue = (weather) => {
+  if (!weather) return '—';
+  const { emoji, kind } = conditionKind(weather.id, weather.icon?.endsWith('n'));
+  const label = kind ?? weather.main;
+  const sky = weather.id >= 800 && weather.id <= 804;
+  const detail = !sky && weather.description && weather.description.toLowerCase() !== label.toLowerCase()
+    ? ` · ${weather.description}` : '';
+  return `${emoji} ${label}${detail}`.trim();
+};
+
 const WeatherDisplay = () => {
+  const {
+    data: locationData,
+    isLoading: isLocationLoading,
+    isError: isLocationError,
+    error: locationError,
+  } = useQuery({
+    queryKey: ['location'],
+    queryFn: () => fetchLocation(),
+    retry: 1,
+  });
+
+  const latitude = locationData?.lat;
+  const longitude = locationData?.lon;
+
   const { data, error, isLoading, isError } = useQuery({
-    queryKey: ['weather'],
-    queryFn: fetchWeather,
+    queryKey: ['weather', latitude, longitude],
+    queryFn: () => fetchWeather(latitude, longitude),
+    enabled: !!(latitude && longitude),
   });
 
   const { showMore, toggleShowMore, panelRef } = useExpandScroll();
 
-  if (isLoading) {
+  if (isLocationLoading || isLoading) {
     return <Container sx={{ textAlign: 'center', mt: 4 }}><CircularProgress /></Container>;
+  }
+
+  if (isLocationError) {
+    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching location data: {locationError?.message}</Alert></Container>;
   }
 
   if (isError) {
@@ -47,11 +96,11 @@ const WeatherDisplay = () => {
           <ListItem key={"description"} divider>
             <ListItemText primary={"Location"} secondary={data?.name} />
           </ListItem>
-          <ListItem key={"temp"} divider>
-            <ListItemText primary={"Temp (C)"} secondary={data.main.temp} />
+          <ListItem key={"conditions"} divider>
+            <ListItemText primary={"Conditions"} secondary={conditionsValue(data.weather?.[0])} />
           </ListItem>
-          <ListItem key={"feels_like"} divider>
-            <ListItemText primary={"Feels Like (C)"} secondary={data.main.feels_like} />
+          <ListItem key={"temp"} divider>
+            <ListItemText primary={"Temp (C)"} secondary={`${sigDigits(data.main.temp, 3)} · feels like ${sigDigits(data.main.feels_like, 3)}`} />
           </ListItem>
           {showMore &&
             data?.main &&

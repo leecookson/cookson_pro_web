@@ -58,11 +58,12 @@ const passValue = ({ start, peak, endsInShadow, durationSeconds }) => {
   return `${formatTime(start.time)} · ${toCompass(start.azimuth)} → ${Math.round(peak.altitude)}° ${toCompass(peak.azimuth)} · ${ending}, ${formatDuration(durationSeconds)}`;
 };
 
-// "from 7:41 PM · highest 52° SSE · mag 0.2 in Cetus". start/end are clipped to
-// the window, so matching a window edge means it's up when the window opens or still up at midnight.
-const planetValue = ({ start, peak, end, magnitude, constellation }, viewWindow) => {
-  const upAtStart = start.time === viewWindow.start;
-  const upAtEnd = end.time === viewWindow.end;
+// "from 7:41 PM · highest 52° SSE · mag 0.2 in Cetus". start/end are clipped to the span the
+// API searched (opensAt to closesAt), so matching an edge means it's up when that span opens or
+// still up at midnight. Planets are searched from the window start, stars from nautical dusk.
+const sightingValue = ({ start, peak, end, magnitude, constellation }, opensAt, closesAt) => {
+  const upAtStart = start.time === opensAt;
+  const upAtEnd = end.time === closesAt;
   const when = upAtStart && upAtEnd ? 'up all evening'
     : upAtStart ? `until ${formatTime(end.time)}`
       : upAtEnd ? `from ${formatTime(start.time)}`
@@ -70,6 +71,16 @@ const planetValue = ({ start, peak, end, magnitude, constellation }, viewWindow)
   const where = `highest ${Math.round(peak.altitude)}° ${toCompass(peak.azimuth)}`;
   const brightness = magnitude != null ? `mag ${magnitude.toFixed(1)}${constellation ? ` in ${constellation}` : ''}` : constellation;
   return [when, where, brightness].filter(Boolean).join(' · ');
+};
+
+// How many star names fit on the collapsed card's one-line summary
+const STAR_SUMMARY_COUNT = 4;
+
+// "Vega, Arcturus, Altair, Deneb +12 more"
+const starsSummary = (stars) => {
+  const named = stars.slice(0, STAR_SUMMARY_COUNT).map((s) => s.name).join(', ');
+  const rest = stars.length - STAR_SUMMARY_COUNT;
+  return rest > 0 ? `${named} +${rest} more` : named;
 };
 
 // window.darkness/darkest are newer than the rest of the API; fall back to the sun's twilight times
@@ -219,9 +230,20 @@ const NightSkyDisplay = () => {
   const planets = (objects ?? [])
     .filter((o) => o.kind === 'planet')
     .sort((a, b) => (a.magnitude ?? 99) - (b.magnitude ?? 99));
+  const stars = (objects ?? [])
+    .filter((o) => o.kind === 'star')
+    .sort((a, b) => (a.magnitude ?? 99) - (b.magnitude ?? 99));
   const unavailableObjects = Object.entries(unavailable ?? {})
     .filter(([key]) => key.startsWith('objects.'))
     .map(([key, why]) => ({ id: key.slice('objects.'.length), why }));
+
+  // Row button that opens the sky view centred on an object
+  const showInSky = (o) => (
+    <IconButton edge="end" size="small" aria-label={`View ${o.name} in the sky`} title="Show in sky view"
+      onClick={() => setSkyView({ focusId: o.id })}>
+      <ExploreIcon fontSize="small" />
+    </IconButton>
+  );
 
   return (
     <Box sx={{ position: 'relative', margin: '8px 8px 0px 8px' }}>
@@ -251,14 +273,12 @@ const NightSkyDisplay = () => {
             <Row
               key={p.id}
               label={p.name}
-              value={planetValue(p, viewWindow)}
-              action={(
-                <IconButton edge="end" size="small" aria-label={`View ${p.name} in the sky`} title="Show in sky view"
-                  onClick={() => setSkyView({ focusId: p.id })}>
-                  <ExploreIcon fontSize="small" />
-                </IconButton>
-              )} />
+              value={sightingValue(p, viewWindow.start, viewWindow.end)}
+              action={showInSky(p)} />
           ))}
+          {stars.length > 0 && (
+            <Row label="Bright stars" value={starsSummary(stars)} />
+          )}
           {passes.map((p) => (
             <Row key={`${p.id}-${p.start.time}`} label={`${objectLabel(p.id)} pass`} value={passValue(p)} />
           ))}
@@ -271,6 +291,23 @@ const NightSkyDisplay = () => {
         </List>
 
         {clouds?.hourly?.length > 0 && <CloudBars hourly={clouds.hourly} />}
+
+        {showMore && stars.length > 0 && (
+          <>
+            <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Bright stars · from {formatTime(viewWindow.darkness.nautical)}
+            </Typography>
+            <List disablePadding>
+              {stars.map((s) => (
+                <Row
+                  key={s.id}
+                  label={s.name}
+                  value={sightingValue(s, viewWindow.darkness.nautical, viewWindow.end)}
+                  action={showInSky(s)} />
+              ))}
+            </List>
+          </>
+        )}
 
         {showMore && clouds?.hourly?.length > 0 && (
           <>

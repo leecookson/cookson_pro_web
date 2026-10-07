@@ -36,7 +36,9 @@ const LocationDisplay = () => {
     return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching data: {error?.message}</Alert></Container>;
   }
 
-  const keysToSkip = ['city', 'country', 'timezone', 'status'];
+  const keysToSkip = ['city', 'regionName', 'country', 'timezone', 'status'];
+  // Browser coordinates that couldn't be named have no city
+  const place = [data.city, data.regionName].filter(Boolean).join(', ') || '—';
 
   return (
     <Box sx={{ position: 'relative', margin: '8px 8px 0px 8px' }}>
@@ -47,7 +49,7 @@ const LocationDisplay = () => {
         <List>
 
           <ListItem key={"description"} divider>
-            <ListItemText primary={"Location"} secondary={data.city} />
+            <ListItemText primary={"Location"} secondary={place} />
           </ListItem>
           <ListItem key={"country"} divider>
             <ListItemText primary={"Country"} secondary={data.country} />
