@@ -19,6 +19,12 @@ import {
 import { toLabelCase } from '../util/labels';
 import { useExpandScroll } from '../util/useExpandScroll';
 
+// How the location was found, from fetchLocation's `source`
+const SOURCE_LABEL = {
+  browser_geolocation: 'Device location (browser)',
+  server_ip_geolocation: 'IP address (approximate)',
+};
+
 const LocationDisplay = () => {
   const { data, error, isLoading, isError } = useQuery({
     queryKey: ['location'],
@@ -63,7 +69,9 @@ const LocationDisplay = () => {
               .filter((key) => !keysToSkip.includes(key))
               .map((key) => (
                 <ListItem key={key} divider>
-                  <ListItemText primary={toLabelCase(key)} secondary={sigDigits(data[key], 4)} />
+                  <ListItemText
+                    primary={toLabelCase(key)}
+                    secondary={key === 'source' ? (SOURCE_LABEL[data.source] ?? toLabelCase(data.source)) : sigDigits(data[key], 4)} />
                 </ListItem>
               ))}
 
