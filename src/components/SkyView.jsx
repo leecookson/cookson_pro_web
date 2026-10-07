@@ -28,6 +28,8 @@ const COLORS = {
   star: '#e6ecff',
   starLabel: 'rgba(216, 222, 234, 0.6)',
   rising: 'rgba(216, 222, 234, 0.7)',
+  // Dimmer than rising: an object that has gone down for the evening matters less
+  set: 'rgba(216, 222, 234, 0.4)',
 };
 
 const PLANET_COLOR = {
@@ -75,10 +77,10 @@ const TAP_SLOP_PX = 6;
 const HIT_RADIUS_PX = 24;
 // How finely to search ahead for when a body below the horizon rises
 const RISE_STEP_MS = 2 * 60000;
-// Rising markers: label offset below the horizon, and spacing between stacked label rows.
+// Horizon markers (rising or set): label offset below the horizon, and spacing between stacked label rows.
 // Clears the compass letters, which sit just under the horizon.
-const RISING_LABEL_DY = 30;
-const RISING_ROW_DY = 12;
+const HORIZON_LABEL_DY = 30;
+const HORIZON_ROW_DY = 12;
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -160,6 +162,17 @@ const risingAfter = (b, time, until) => {
   return null;
 };
 
+// Where a body below the horizon at `time` last went down, after `since`: { azimuth } or null.
+// Passes end at their last visible point; the rest are stepped back.
+const settingBefore = (b, time, since) => {
+  if (b.kind === 'satellite') return b.to < time ? b.at(b.to) : null;
+  for (let t = time - RISE_STEP_MS; t >= since; t -= RISE_STEP_MS) {
+    const earlier = b.at(t);
+    if (earlier.altitude > 0) return earlier;
+  }
+  return null;
+};
+
 // Everything that can be selected or followed. Stars come first so they draw underneath.
 const selectable = (bodies) => [...bodies.stars, ...bodies.planets, ...bodies.passes, ...(bodies.moon ? [bodies.moon] : [])];
 
@@ -212,11 +225,12 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
   const [following, setFollowing] = useState(!!focusId);
 
   const followed = following && selectable(bodies).find((b) => b.id === selectedId);
-  // Below the horizon, face where it will rise (its marker) rather than where it is now
+  // Below the horizon, face its marker (where it will rise, else where it went down) rather
+  // than where it is now
   const followedNow = followed && followed.at(time);
   const followedPos = followedNow?.altitude > 0
     ? followedNow
-    : followed && (risingAfter(followed, time, windowEnd) ?? followedNow);
+    : followed && (risingAfter(followed, time, windowEnd) ?? settingBefore(followed, time, windowStart) ?? followedNow);
   useEffect(() => {
     if (!followedPos || view.fov === null || !width) return;
     // Centred left-right. A body low in the sky is shown with the horizon in the lower
@@ -303,8 +317,8 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
     const rect = svgRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    // A rising marker's label hangs below its arrow, so it is hit around the middle of the two
-    const markerHits = risingMarkers.map((m) => ({ id: m.id, x: m.x, y: m.y + RISING_LABEL_DY / 2 }));
+    // A horizon marker's label hangs below its arrow, so it is hit around the middle of the two
+    const markerHits = horizonMarkers.map((m) => ({ id: m.id, x: m.x, y: m.y + HORIZON_LABEL_DY / 2 }));
     const hit = [...placed, ...markerHits]
       .map((b) => ({ id: b.id, d: Math.hypot(b.x - x, b.y - y) }))
       .filter((b) => b.d < HIT_RADIUS_PX)
@@ -345,22 +359,25 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
       .filter((b) => b.front && b.x > -50 && b.x < width + 50 && b.y > -50 && b.y < height + 50);
   }, [projection, bodies, time, width, height, sunAlt, selectedId]);
 
-  // Bodies below the horizon at `time` that come up later in the window, marked where they will rise
-  const risings = useMemo(() => selectable(bodies)
+  // Bodies below the horizon at `time` that are up at some other point in the window, marked
+  // where they will rise or, failing that, where they went down. Rising wins: it's where to look next.
+  const horizonMarks = useMemo(() => selectable(bodies)
     .map((b) => {
       const pos = b.at(time);
       if (pos && pos.altitude > 0) return null;
       const rise = risingAfter(b, time, windowEnd);
-      return rise && { id: b.id, name: b.name, azimuth: rise.azimuth };
+      if (rise) return { id: b.id, name: b.name, azimuth: rise.azimuth, rising: true };
+      const set = settingBefore(b, time, windowStart);
+      return set && { id: b.id, name: b.name, azimuth: set.azimuth, rising: false };
     })
-    .filter(Boolean), [bodies, time, windowEnd]);
+    .filter(Boolean), [bodies, time, windowStart, windowEnd]);
 
-  // Screen positions of the rising markers on the horizon (also used for hit-testing), with
-  // labels stacked in rows so neighbours don't overlap
-  const risingMarkers = useMemo(() => {
+  // Screen positions of the horizon markers (also used for hit-testing), with labels stacked
+  // in rows so neighbours don't overlap
+  const horizonMarkers = useMemo(() => {
     if (!projection) return [];
     const rowEnds = [];
-    return risings
+    return horizonMarks
       .map((r) => ({ ...r, ...projection.project({ altitude: 0, azimuth: r.azimuth }) }))
       .filter((m) => m.front && m.x > -20 && m.x < width + 20)
       .sort((a, b) => a.x - b.x)
@@ -371,7 +388,7 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
         rowEnds[row] = m.x + halfWidth;
         return { ...m, row };
       });
-  }, [projection, risings, width]);
+  }, [projection, horizonMarks, width]);
 
   // Same outer element either way, so the size observer keeps watching it
   if (!ready) {
@@ -527,12 +544,12 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
               fontWeight={label.length === 1 ? 600 : 400} textAnchor="middle" fill={COLORS.compass}>{label}</text>
           ))}
 
-          {risingMarkers.map((m) => {
-            const color = m.id === selectedId ? COLORS.label : COLORS.rising;
+          {horizonMarkers.map((m) => {
+            const color = m.id === selectedId ? COLORS.label : m.rising ? COLORS.rising : COLORS.set;
             return (
-              <g key={`rising-${m.id}`} transform={`translate(${m.x},${m.y})`}>
+              <g key={`horizon-${m.id}`} transform={`translate(${m.x},${m.y})`}>
                 <path d="M-4,-10L4,-10L0,-2Z" fill={color} />
-                <text y={RISING_LABEL_DY + m.row * RISING_ROW_DY} fontSize={10} textAnchor="middle" fill={color}>{m.name}</text>
+                <text y={HORIZON_LABEL_DY + m.row * HORIZON_ROW_DY} fontSize={10} textAnchor="middle" fill={color}>{m.name}</text>
               </g>
             );
           })}
