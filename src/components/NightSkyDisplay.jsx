@@ -9,17 +9,16 @@ import ExploreIcon from '@mui/icons-material/Explore';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import {
-  CircularProgress,
   Typography,
   List,
   ListItem,
   ListItemText,
   Paper,
   Alert,
-  Container,
   Box,
   IconButton,
 } from '@mui/material';
+import { LoadingCard, ErrorCard } from './GhostCard';
 
 const MOON_PHASE_EMOJI = {
   new_moon: '🌑',
@@ -73,13 +72,14 @@ const sightingValue = ({ start, peak, end, magnitude, constellation }, opensAt, 
   return [when, where, brightness].filter(Boolean).join(' · ');
 };
 
-// How many star names fit on the collapsed card's one-line summary
-const STAR_SUMMARY_COUNT = 4;
+// How many names fit on the collapsed card's one-line summary
+const VISIBLE_SUMMARY_COUNT = 3;
 
-// "Vega, Arcturus, Altair, Deneb +12 more"
-const starsSummary = (stars) => {
-  const named = stars.slice(0, STAR_SUMMARY_COUNT).map((s) => s.name).join(', ');
-  const rest = stars.length - STAR_SUMMARY_COUNT;
+// "Saturn, ISS, Arcturus +11 more": planets, then the ISS, then stars, each brightest first
+const visibleSummary = (names) => {
+  if (names.length === 0) return 'No planets or bright stars up';
+  const rest = names.length - VISIBLE_SUMMARY_COUNT;
+  const named = names.slice(0, VISIBLE_SUMMARY_COUNT).join(', ');
   return rest > 0 ? `${named} +${rest} more` : named;
 };
 
@@ -147,15 +147,24 @@ const moonValue = (moon, when) => {
 };
 
 // clearest is null when the cover is steady, so no hour stands out
-const cloudsValue = ({ meanCover, minCover, maxCover, clearest }) => {
-  const range = `${meanCover}% avg (${minCover}–${maxCover}%)`;
-  return clearest ? `${range} · clearest ${formatTime(clearest.time)}` : range;
-};
+// "Partly cloudy · clearest 9:00 PM", or "Clear all evening"
+const cloudsValue = (summary) =>
+  summary.clearest ? `${skyLabel(summary)} · clearest ${formatTime(summary.clearest.time)}` : skyLabel(summary);
 
+// "12% avg (4–30%)"
+const coverValue = ({ meanCover, minCover, maxCover }) => `${meanCover}% avg (${minCover}–${maxCover}%)`;
+
+// Same row style as the other cards
 const Row = ({ label, value, action }) => (
-  <ListItem disableGutters dense divider secondaryAction={action}>
+  <ListItem divider secondaryAction={action}>
     <ListItemText primary={label} secondary={value} />
   </ListItem>
+);
+
+const SectionHeading = ({ children }) => (
+  <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 1, px: 2 }}>
+    {children}
+  </Typography>
 );
 
 const CloudBars = ({ hourly }) => (
@@ -209,15 +218,15 @@ const NightSkyDisplay = () => {
   });
 
   if (isLocationLoading || isLoading) {
-    return <Container sx={{ textAlign: 'center', mt: 4 }}><CircularProgress /></Container>;
+    return <LoadingCard />;
   }
 
   if (isLocationError) {
-    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching location data: {locationError?.message}</Alert></Container>;
+    return <ErrorCard>Error fetching location data: {locationError?.message}</ErrorCard>;
   }
 
   if (isError) {
-    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching tonight&apos;s sky: {error?.message}</Alert></Container>;
+    return <ErrorCard>Error fetching tonight&apos;s sky: {error?.message}</ErrorCard>;
   }
 
   const { status, reason, window: viewWindow, sun, moon, clouds, objects, unavailable } = data;
@@ -233,6 +242,11 @@ const NightSkyDisplay = () => {
   const stars = (objects ?? [])
     .filter((o) => o.kind === 'star')
     .sort((a, b) => (a.magnitude ?? 99) - (b.magnitude ?? 99));
+  const visibleNames = [
+    ...planets.map((p) => p.name),
+    ...(passes.length ? [objectLabel('iss')] : []),
+    ...stars.map((s) => s.name),
+  ];
   const unavailableObjects = Object.entries(unavailable ?? {})
     .filter(([key]) => key.startsWith('objects.'))
     .map(([key, why]) => ({ id: key.slice('objects.'.length), why }));
@@ -248,80 +262,78 @@ const NightSkyDisplay = () => {
   return (
     <Box sx={{ position: 'relative', margin: '8px 8px 0px 8px' }}>
       <Paper ref={panelRef} elevation={3} sx={{ position: 'relative', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
-        <Typography variant="h5" gutterBottom>
+        {/* Right padding keeps the window time clear of the sky view button */}
+        <Typography variant="h5" gutterBottom sx={{ pr: 4 }}>
           Night Sky
           {viewWindow && (
             <Typography component="span" variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
-              {formatTime(viewWindow.start)} – {formatTime(viewWindow.end)}
+              {/* The window always ends at local midnight */}
+              from {formatTime(viewWindow.start)}
             </Typography>
           )}
         </Typography>
 
         {status === 'na' && <Alert severity="info" sx={{ mb: 1 }}>{reason}</Alert>}
 
-        <List disablePadding>
-          {clouds && (
-            <Row
-              label={`Clouds · ${skyLabel(clouds.summary)}`}
-              value={cloudsValue(clouds.summary)} />
-          )}
+        {/* Three rows collapsed, like the other cards; expanding continues the same list */}
+        <List>
+          {clouds && <Row label="Clouds" value={cloudsValue(clouds.summary)} />}
           {status === 'ok' && !clouds && (
             <Row label="Clouds" value={unavailable?.clouds ?? 'Not available'} />
           )}
           <Row label="Moon" value={moonValue(moon, moonWhen)} />
-          {planets.map((p) => (
-            <Row
-              key={p.id}
-              label={p.name}
-              value={sightingValue(p, viewWindow.start, viewWindow.end)}
-              action={showInSky(p)} />
-          ))}
-          {stars.length > 0 && (
-            <Row label="Bright stars" value={starsSummary(stars)} />
-          )}
-          {passes.map((p) => (
-            <Row key={`${p.id}-${p.start.time}`} label={`${objectLabel(p.id)} pass`} value={passValue(p)} />
-          ))}
-          {unavailableObjects.map(({ id, why }) => (
-            <Row key={id} label={objectLabel(id)} value={why} />
-          ))}
-          {status === 'ok' && (
-            <Row label="Dark sky" value={darkSkyValue(viewWindow, sun)} />
+          {status === 'ok' && <Row label="Visible tonight" value={visibleSummary(visibleNames)} />}
+          {showMore && status === 'ok' && (
+            <>
+              <Row label="Dark sky" value={darkSkyValue(viewWindow, sun)} />
+              {planets.map((p) => (
+                <Row
+                  key={p.id}
+                  label={p.name}
+                  value={sightingValue(p, viewWindow.start, viewWindow.end)}
+                  action={showInSky(p)} />
+              ))}
+              {passes.map((p) => (
+                <Row key={`${p.id}-${p.start.time}`} label={`${objectLabel(p.id)} pass`} value={passValue(p)} />
+              ))}
+              {unavailableObjects.map(({ id, why }) => (
+                <Row key={id} label={objectLabel(id)} value={why} />
+              ))}
+            </>
           )}
         </List>
 
-        {clouds?.hourly?.length > 0 && <CloudBars hourly={clouds.hourly} />}
-
-        {showMore && stars.length > 0 && (
+        {showMore && status === 'ok' && (
           <>
-            <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              Bright stars · from {formatTime(viewWindow.darkness.nautical)}
-            </Typography>
-            <List disablePadding>
-              {stars.map((s) => (
-                <Row
-                  key={s.id}
-                  label={s.name}
-                  value={sightingValue(s, viewWindow.darkness.nautical, viewWindow.end)}
-                  action={showInSky(s)} />
-              ))}
-            </List>
-          </>
-        )}
+            {stars.length > 0 && (
+              <>
+                <SectionHeading>Bright stars · from {formatTime(viewWindow.darkness.nautical)}</SectionHeading>
+                <List>
+                  {stars.map((s) => (
+                    <Row
+                      key={s.id}
+                      label={s.name}
+                      value={sightingValue(s, viewWindow.darkness.nautical, viewWindow.end)}
+                      action={showInSky(s)} />
+                  ))}
+                </List>
+              </>
+            )}
 
-        {showMore && clouds?.hourly?.length > 0 && (
-          <>
-            <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              Hourly · low / mid / high
-            </Typography>
-            <List disablePadding>
-              {clouds.hourly.map((h) => (
-                <Row
-                  key={h.time}
-                  label={`${formatTime(h.time)} · ${h.cover}%`}
-                  value={`${h.low} / ${h.mid} / ${h.high}% · visibility ${Math.round(h.visibilityMeters / 1000)} km`} />
-              ))}
-            </List>
+            {clouds?.hourly?.length > 0 && (
+              <>
+                <SectionHeading>Cloud cover · {coverValue(clouds.summary)}</SectionHeading>
+                <Box sx={{ px: 2 }}><CloudBars hourly={clouds.hourly} /></Box>
+                <List>
+                  {clouds.hourly.map((h) => (
+                    <Row
+                      key={h.time}
+                      label={`${formatTime(h.time)} · ${h.cover}%`}
+                      value={`low ${h.low} · mid ${h.mid} · high ${h.high}% · ${Math.round(h.visibilityMeters / 1000)} km visibility`} />
+                  ))}
+                </List>
+              </>
+            )}
           </>
         )}
       </Paper>
@@ -342,7 +354,7 @@ const NightSkyDisplay = () => {
             anchorTime={dataUpdatedAt} />
         </>
       )}
-      {/* Pass rows can overflow the card even without hourly detail, so expand is always offered */}
+      {/* Dark-sky time, planets, passes and stars are all under expand */}
       {status === 'ok' && (
         <Box sx={{ position: 'absolute', bottom: 8, right: 8 }}>
           <IconButton onClick={toggleShowMore} size="small">

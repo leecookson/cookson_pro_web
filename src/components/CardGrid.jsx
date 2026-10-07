@@ -6,6 +6,7 @@ import AstroDisplay from './AstroDisplay';
 import WeatherDisplay from './WeatherDisplay';
 import SunMoonDisplay from './SunMoonDisplay';
 import NightSkyDisplay from './NightSkyDisplay';
+import GhostCard from './GhostCard';
 
 const CARDS = [LocationDisplay, WeatherDisplay, AstroDisplay, SunMoonDisplay, NightSkyDisplay];
 
@@ -25,20 +26,6 @@ const useColumnCount = () => {
   if (isSm) return COLUMNS.sm;
   return COLUMNS.xs;
 };
-
-// Fills an empty cell in the last row so the grid reads as a full rectangle.
-// Same footprint as a card (8px side margins, 300px Paper), colored halfway
-// between the card and the page background.
-const GhostCard = () => (
-  <Box sx={{ margin: '8px 8px 0px 8px' }}>
-    <Box
-      sx={(theme) => ({
-        height: '300px',
-        borderRadius: `${theme.shape.borderRadius}px`,
-        backgroundColor: `color-mix(in srgb, ${theme.palette.background.paper} 50%, ${theme.palette.background.default})`,
-      })} />
-  </Box>
-);
 
 function CardGrid() {
   const columns = useColumnCount();

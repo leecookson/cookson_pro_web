@@ -14,10 +14,10 @@ import {
   ListItemText,
   Paper,
   Alert,
-  Container,
   Box,
   IconButton,
 } from '@mui/material';
+import { LoadingCard, ErrorCard } from './GhostCard';
 import { toLabelCase } from '../util/labels';
 import { useExpandScroll } from '../util/useExpandScroll';
 
@@ -105,15 +105,15 @@ const AstroDisplay = () => {
   };
 
   if (isLocationLoading || isAstroLoading) {
-    return <Container sx={{ textAlign: 'center', mt: 4 }}><CircularProgress /></Container>;
+    return <LoadingCard />;
   }
 
   if (isLocationError) {
-    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching location data: {locationError?.message}</Alert></Container>;
+    return <ErrorCard>Error fetching location data: {locationError?.message}</ErrorCard>;
   }
 
   if (isAstroError) {
-    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching astronomical data: {astroError?.message}</Alert></Container>;
+    return <ErrorCard>Error fetching astronomical data: {astroError?.message}</ErrorCard>;
   }
   const type = astroData.data?.[0]?.type?.name;
   const subType = astroData.data?.[0]?.type?.subtype;

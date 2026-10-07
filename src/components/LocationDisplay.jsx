@@ -5,17 +5,16 @@ import { sigDigits } from '../util/labels';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import {
-  CircularProgress,
   Typography,
   List,
   ListItem,
   ListItemText,
   Paper,
   Alert,
-  Container,
   Box,
   IconButton,
 } from '@mui/material';
+import { LoadingCard, ErrorCard } from './GhostCard';
 import { toLabelCase } from '../util/labels';
 import { useExpandScroll } from '../util/useExpandScroll';
 
@@ -35,11 +34,11 @@ const LocationDisplay = () => {
   const { showMore, toggleShowMore, panelRef } = useExpandScroll();
 
   if (isLoading) {
-    return <Container sx={{ textAlign: 'center', mt: 4 }}><CircularProgress /></Container>;
+    return <LoadingCard />;
   }
 
   if (isError) {
-    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching data: {error?.message}</Alert></Container>;
+    return <ErrorCard>Error fetching data: {error?.message}</ErrorCard>;
   }
 
   const keysToSkip = ['city', 'regionName', 'country', 'timezone', 'status'];

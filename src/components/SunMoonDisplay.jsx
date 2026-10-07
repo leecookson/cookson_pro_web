@@ -6,17 +6,16 @@ import { useExpandScroll } from '../util/useExpandScroll';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import {
-  CircularProgress,
   Typography,
   List,
   ListItem,
   ListItemText,
   Paper,
   Alert,
-  Container,
   Box,
   IconButton,
 } from '@mui/material';
+import { LoadingCard, ErrorCard } from './GhostCard';
 
 const MOON_PHASE_EMOJI = {
   new_moon: '🌑',
@@ -96,15 +95,15 @@ const SunMoonDisplay = () => {
   const { showMore, toggleShowMore, panelRef } = useExpandScroll();
 
   if (isLocationLoading || isLoading) {
-    return <Container sx={{ textAlign: 'center', mt: 4 }}><CircularProgress /></Container>;
+    return <LoadingCard />;
   }
 
   if (isLocationError) {
-    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching location data: {locationError?.message}</Alert></Container>;
+    return <ErrorCard>Error fetching location data: {locationError?.message}</ErrorCard>;
   }
 
   if (isError) {
-    return <Container sx={{ mt: 4 }}><Alert severity="error">Error fetching sun &amp; moon data: {error?.message}</Alert></Container>;
+    return <ErrorCard>Error fetching sun &amp; moon data: {error?.message}</ErrorCard>;
   }
 
   const { sun, moon } = data;
