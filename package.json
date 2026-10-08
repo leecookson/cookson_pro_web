@@ -26,6 +26,7 @@
     "color-thief-react": "^2.1.0",
     "esbuild": "0.25.9",
     "express": "^5",
+    "geomagnetism": "^0.2.0",
     "http-proxy-middleware": "3.0.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

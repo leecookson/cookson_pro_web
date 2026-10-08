@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
+import ScreenRotationIcon from '@mui/icons-material/ScreenRotation';
 import { Box, Dialog, IconButton, Slider, Typography } from '@mui/material';
 import {
   MOON_DEG_PER_HOUR,
@@ -11,6 +12,7 @@ import {
   screenDirection,
   skyPath,
 } from '../util/sky';
+import { hasDeviceOrientation, requestOrientationPermission, useCompassHeading } from '../util/useCompassHeading';
 
 // The view is a night sky whatever the app theme, so its colors are fixed
 const COLORS = {
@@ -202,7 +204,7 @@ const useElementSize = () => {
   return [ref, size];
 };
 
-const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
+const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId, motion, onMotionOff }) => {
   const [boxRef, { width, height }] = useElementSize();
   const svgRef = useRef(null);
   const viewWindow = data.window;
@@ -223,6 +225,16 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
   // While following, the view stays centred on the selected body as time changes;
   // dragging the view stops it
   const [following, setFollowing] = useState(!!focusId);
+
+  // Motion view: the phone's compass sets which way the view faces. Up/down stays manual
+  // (zenith always up); dragging sideways hands control back to the user.
+  const { heading, status: compassStatus } = useCompassHeading(motion, latitude, longitude);
+  useEffect(() => {
+    if (motion) setFollowing(false);
+  }, [motion]);
+  useEffect(() => {
+    if (motion && heading != null) setView((v) => ({ ...v, azimuth: heading }));
+  }, [motion, heading]);
 
   const followed = following && selectable(bodies).find((b) => b.id === selectedId);
   // Below the horizon, face its marker (where it will rise, else where it went down) rather
@@ -266,6 +278,14 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
     if (!projection) return;
     setFollowing(false);
     const k = projection.degreesPerPixel;
+    if (motion) {
+      // Mostly-vertical drags tilt the view; a sideways drag turns motion off
+      if (Math.abs(dx) <= Math.abs(dy) || Math.abs(dx) < 3) {
+        setView((v) => ({ ...v, altitude: clamp(v.altitude + dy * k, MIN_ALT, MAX_ALT) }));
+        return;
+      }
+      onMotionOff();
+    }
     setView((v) => ({
       ...v,
       azimuth: (((v.azimuth - dx * k) % 360) + 360) % 360,
@@ -324,7 +344,8 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
       .filter((b) => b.d < HIT_RADIUS_PX)
       .sort((a, b) => a.d - b.d)[0];
     setSelectedId(hit?.id ?? null);
-    setFollowing(!!hit);
+    // The compass decides the direction in motion view, so a tap only selects
+    setFollowing(!!hit && !motion);
   };
 
   const onKeyDown = (e) => {
@@ -556,7 +577,9 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
         </svg>
 
         <Typography variant="caption" sx={{ position: 'absolute', left: 12, bottom: 8, color: COLORS.compass, pointerEvents: 'none' }}>
-          Facing {toCompass(view.azimuth)} {Math.round(view.azimuth)}° · {Math.round(view.altitude)}° up
+          {motion && compassStatus === 'waiting'
+            ? 'Motion view · waiting for the compass…'
+            : `Facing ${toCompass(view.azimuth)} ${Math.round(view.azimuth)}° · ${Math.round(view.altitude)}° up${motion ? ' · motion' : ''}`}
         </Typography>
         {selected && selectedPos && (
           <Typography variant="body2" sx={{ position: 'absolute', left: 12, top: 8, color: COLORS.label, pointerEvents: 'none' }}>
@@ -592,17 +615,62 @@ const SkyCanvas = ({ data, latitude, longitude, anchorTime, focusId }) => {
 // slide through the evening. `anchorTime` is when `data` was fetched, since its sun and moon
 // positions are for that moment.
 // `focusId` (an object id, e.g. "saturn") starts the view centred on that object.
-const SkyView = ({ open, onClose, data, latitude, longitude, anchorTime, focusId }) => (
-  <Dialog fullScreen open={open} onClose={onClose}
-    slotProps={{ paper: { sx: { bgcolor: COLORS.ground, display: 'flex', flexDirection: 'column' } } }}>
-    <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.5, color: COLORS.label }}>
-      <IconButton aria-label="close" onClick={onClose} sx={{ color: COLORS.label }}>
-        <CloseIcon />
-      </IconButton>
-      <Typography variant="h6" sx={{ ml: 1 }}>Tonight&apos;s sky</Typography>
-    </Box>
-    {open && data?.window && <SkyCanvas data={data} latitude={latitude} longitude={longitude} anchorTime={anchorTime} focusId={focusId} />}
-  </Dialog>
-);
+const SkyView = ({ open, onClose, data, latitude, longitude, anchorTime, focusId }) => {
+  const [motion, setMotion] = useState(false);
+  const [motionError, setMotionError] = useState(null);
+
+  // Must run straight from the tap: iOS only shows its permission prompt for a user gesture
+  const toggleMotion = async () => {
+    setMotionError(null);
+    if (motion) {
+      setMotion(false);
+      return;
+    }
+    if (await requestOrientationPermission()) {
+      setMotion(true);
+    } else {
+      setMotionError('Motion access was not allowed');
+    }
+  };
+
+  const close = () => {
+    setMotion(false);
+    setMotionError(null);
+    onClose();
+  };
+
+  return (
+    <Dialog fullScreen open={open} onClose={close}
+      slotProps={{ paper: { sx: { bgcolor: COLORS.ground, display: 'flex', flexDirection: 'column' } } }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.5, color: COLORS.label }}>
+        <IconButton aria-label="close" onClick={close} sx={{ color: COLORS.label }}>
+          <CloseIcon />
+        </IconButton>
+        <Typography variant="h6" sx={{ ml: 1, flex: 1 }}>Tonight&apos;s sky</Typography>
+        {motionError && <Typography variant="caption" sx={{ mr: 1, color: COLORS.compass }}>{motionError}</Typography>}
+        {hasDeviceOrientation() && (
+          <IconButton
+            aria-label={motion ? 'Turn off motion view' : 'Turn on motion view'}
+            aria-pressed={motion}
+            title="Motion view: point your phone at the sky"
+            onClick={toggleMotion}
+            sx={{ color: motion ? COLORS.iss : COLORS.label }}>
+            <ScreenRotationIcon />
+          </IconButton>
+        )}
+      </Box>
+      {open && data?.window && (
+        <SkyCanvas
+          data={data}
+          latitude={latitude}
+          longitude={longitude}
+          anchorTime={anchorTime}
+          focusId={focusId}
+          motion={motion}
+          onMotionOff={() => setMotion(false)} />
+      )}
+    </Dialog>
+  );
+};
 
 export default SkyView;
