@@ -65,7 +65,7 @@ const WeatherDisplay = () => {
   const { data, error, isLoading, isError } = useQuery({
     queryKey: ['weather', latitude, longitude],
     queryFn: () => fetchWeather(latitude, longitude),
-    enabled: !!(latitude && longitude),
+    enabled: latitude != null && longitude != null,
   });
 
   const { showMore, toggleShowMore, panelRef } = useExpandScroll();

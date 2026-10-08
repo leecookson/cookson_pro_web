@@ -53,7 +53,7 @@ const AstroDisplay = () => {
     queryKey: ['astro', latitude, longitude],
     queryFn: () => fetchAstroData(latitude, longitude),
     // The `enabled` option ensures this query only runs when latitude and longitude are available.
-    enabled: !!(latitude && longitude)
+    enabled: latitude != null && longitude != null
   });
 
   const {

@@ -7,6 +7,7 @@ import WeatherDisplay from './WeatherDisplay';
 import SunMoonDisplay from './SunMoonDisplay';
 import NightSkyDisplay from './NightSkyDisplay';
 import GhostCard from './GhostCard';
+import CardErrorBoundary from './CardErrorBoundary';
 
 const CARDS = [LocationDisplay, WeatherDisplay, AstroDisplay, SunMoonDisplay, NightSkyDisplay];
 
@@ -44,7 +45,7 @@ function CardGrid() {
         pb: 2,
       }}
     >
-      {CARDS.map((Card, i) => <Card key={i} />)}
+      {CARDS.map((Card, i) => <CardErrorBoundary key={i}><Card /></CardErrorBoundary>)}
       {Array.from({ length: ghostCount }, (_, i) => <GhostCard key={`ghost-${i}`} />)}
     </Box>
   );

@@ -210,7 +210,7 @@ const NightSkyDisplay = () => {
   const { data, error, isLoading, isError, dataUpdatedAt } = useQuery({
     queryKey: ['tonight', latitude, longitude],
     queryFn: () => fetchTonight(latitude, longitude),
-    enabled: !!(latitude && longitude),
+    enabled: latitude != null && longitude != null,
     retry: 1,
     // This card only uses the window-based parts of the response (forecast, passes,
     // rise/set times), which change slowly, so it needn't follow the API's 60 s max-age

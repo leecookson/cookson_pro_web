@@ -86,7 +86,7 @@ const SunMoonDisplay = () => {
   const { data, error, isLoading, isError } = useQuery({
     queryKey: ['sunmoon', latitude, longitude],
     queryFn: () => fetchSunMoon(latitude, longitude),
-    enabled: !!(latitude && longitude),
+    enabled: latitude != null && longitude != null,
     retry: 1,
     // Positions and countdowns are relative to now
     refetchInterval: 60000,
