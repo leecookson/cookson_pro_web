@@ -109,6 +109,48 @@ const SunMoonDisplay = () => {
   const { sun, moon } = data;
   const nextPhase = moon.next?.[0];
   const sunEvent = nextEvent(sun);
+  // Daytime is sunrise to sunset, i.e. the next sun event is a sunset. The sun's state leads
+  // the card even when the moon is also up in the day.
+  const daytime = sun.polar ? sun.polar === 'always_up' : sunEvent?.label === 'Sunset';
+
+  const sunRows = [
+    <ListItem key="sun-next" divider>
+      <ListItemText
+        primary={sunEvent ? sunEvent.label : 'Sunrise / Sunset'}
+        secondary={
+          sun.polar === 'always_up' ? 'Sun up all day'
+            : sun.polar === 'always_down' ? 'Sun down all day'
+              : sunEvent ? `${formatTime(sunEvent.time)} (${formatCountdown(sunEvent.time)})`
+                : '—'
+        } />
+    </ListItem>,
+    <ListItem key="sun-position" divider>
+      <ListItemText
+        primary="Sun Position"
+        secondary={
+          !sun.position ? '—'
+            : sun.position.altitude >= 0 ? `${Math.round(sun.position.altitude)}° up, ${toCompass(sun.position.azimuth)}`
+              : `${Math.round(sun.position.altitude)}°, ${sunState(sun.position.altitude)}`
+        } />
+    </ListItem>,
+  ];
+
+  const moonRows = [
+    <ListItem key="moon-phase" divider>
+      <ListItemText
+        primary="Moon Phase"
+        secondary={`${MOON_PHASE_EMOJI[moon.phase.name] ?? ''} ${toLabelCase(moon.phase.name)}, ${Math.round(moon.phase.illumination * 100)}% lit`} />
+    </ListItem>,
+    <ListItem key="moon-position" divider>
+      <ListItemText
+        primary="Moon Position"
+        secondary={
+          !moon.position ? '—'
+            : moon.position.altitude >= 0 ? `${Math.round(moon.position.altitude)}° up, ${toCompass(moon.position.azimuth)}`
+              : `Below horizon, rises ${formatTime(moon.nextRise)}`
+        } />
+    </ListItem>,
+  ];
 
   return (
     <Box sx={{ position: 'relative', margin: '8px 8px 0px 8px' }}>
@@ -118,49 +160,14 @@ const SunMoonDisplay = () => {
         </Typography>
         <List>
 
-          <ListItem key={"moon-phase"} divider>
-            <ListItemText
-              primary={"Moon Phase"}
-              secondary={`${MOON_PHASE_EMOJI[moon.phase.name] ?? ''} ${toLabelCase(moon.phase.name)}, ${Math.round(moon.phase.illumination * 100)}% lit`} />
-          </ListItem>
-          <ListItem key={"moon-position"} divider>
-            <ListItemText
-              primary={"Moon Position"}
-              secondary={
-                !moon.position ? '—'
-                  : moon.position.altitude >= 0 ? `${Math.round(moon.position.altitude)}° up, ${toCompass(moon.position.azimuth)}`
-                    : `Below horizon, rises ${formatTime(moon.nextRise)}`
-              } />
-          </ListItem>
+          {daytime ? [...sunRows, ...moonRows] : [...moonRows, ...sunRows]}
+          {/* The next phase is the least time-sensitive, so it always comes last */}
           {nextPhase && (
-            <ListItem key={"moon-next"} divider>
+            <ListItem key="moon-next" divider>
               <ListItemText
                 primary={toLabelCase(nextPhase.name)}
                 secondary={`${MOON_PHASE_EMOJI[nextPhase.name] ?? ''} ${formatDate(nextPhase.time)}`} />
             </ListItem>
-          )}
-          {showMore && (
-            <>
-              <ListItem key={"sun-next"} divider>
-                <ListItemText
-                  primary={sunEvent ? sunEvent.label : 'Sunrise / Sunset'}
-                  secondary={
-                    sun.polar === 'always_up' ? 'Sun up all day'
-                      : sun.polar === 'always_down' ? 'Sun down all day'
-                        : sunEvent ? `${formatTime(sunEvent.time)} (${formatCountdown(sunEvent.time)})`
-                          : '—'
-                  } />
-              </ListItem>
-              <ListItem key={"sun-altitude"} divider>
-                <ListItemText
-                  primary={"Sun Altitude"}
-                  secondary={
-                    sun.position
-                      ? `${Math.round(sun.position.altitude)}°, ${sunState(sun.position.altitude)}`
-                      : '—'
-                  } />
-              </ListItem>
-            </>
           )}
         </List>
       </Paper>
