@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchWeather } from '../apis/weather';
+import { fetchWeather, fetchAirQuality } from '../apis/weather';
 import { fetchLocation } from '../apis/location';
 import { sigDigits } from '../util/labels';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -12,11 +12,29 @@ import {
   ListItemText,
   Paper,
   Alert,
-  Box, IconButton
+  Box, IconButton, Chip
 } from '@mui/material';
 import { LoadingCard, ErrorCard } from './GhostCard';
 import { toLabelCase } from '../util/labels';
 import { useExpandScroll } from '../util/useExpandScroll';
+import { isSamePlace } from '../util/placeName';
+import { AQI_SCALES, POLLUTANT_LABELS, uvLabel, textColorOn } from '../util/airQuality';
+
+// "US 55 · Moderate" in the category's color, or an outlined "US —" when the scale has no value
+const AqiChip = ({ scale, reading }) => {
+  const { name, categories } = AQI_SCALES[scale];
+  const category = reading && categories[reading.category];
+  if (!category) {
+    return <Chip size="small" variant="outlined" label={`${name} —`} />;
+  }
+  return (
+    <Chip
+      size="small"
+      label={`${name} ${reading.value} · ${category.short}`}
+      title={`${name} AQI: ${category.label}`}
+      sx={{ bgcolor: category.color, color: textColorOn(category.color) }} />
+  );
+};
 
 // Kind of weather from OpenWeatherMap's condition code (weather[0].id):
 // https://openweathermap.org/weather-conditions. `night` swaps the sun for a moon when clear.
@@ -68,6 +86,15 @@ const WeatherDisplay = () => {
     enabled: latitude != null && longitude != null,
   });
 
+  // Separate from the weather query, so an air quality failure only affects its own rows
+  const { data: air, error: airError } = useQuery({
+    queryKey: ['airquality', latitude, longitude],
+    queryFn: () => fetchAirQuality(latitude, longitude),
+    enabled: latitude != null && longitude != null,
+    retry: 1,
+    refetchInterval: 30 * 60000,
+  });
+
   const { showMore, toggleShowMore, panelRef } = useExpandScroll();
 
   if (isLocationLoading || isLoading) {
@@ -84,6 +111,67 @@ const WeatherDisplay = () => {
 
   const keysToSkip = ['temp', 'feels_like'];
 
+  const rows = [
+    // Only when OpenWeatherMap reports for a different town than the Location card shows
+    data?.name && !isSamePlace(locationData?.city, data.name) && (
+      <ListItem key="reported-for" divider>
+        <ListItemText primary="Reported For" secondary={data.name} />
+      </ListItem>
+    ),
+    <ListItem key="conditions" divider>
+      <ListItemText primary="Conditions" secondary={conditionsValue(data.weather?.[0])} />
+    </ListItem>,
+    <ListItem key="temp" divider>
+      <ListItemText primary="Temp (C)" secondary={`${sigDigits(data.main.temp, 3)} · feels like ${sigDigits(data.main.feels_like, 3)}`} />
+    </ListItem>,
+    // Hidden when neither scale has a value
+    (air?.aqi?.us || air?.aqi?.eu) && (
+      <ListItem key="air-quality" divider>
+        <ListItemText
+          primary="Air Quality"
+          slotProps={{ secondary: { component: 'div' } }}
+          secondary={
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+              <AqiChip scale="us" reading={air.aqi.us} />
+              <AqiChip scale="eu" reading={air.aqi.eu} />
+            </Box>
+          } />
+      </ListItem>
+    ),
+  ].filter(Boolean);
+
+  // Air quality details, shown only when expanded
+  const dominantValue = air && ['us', 'eu']
+    .filter((scale) => air.aqi[scale]?.dominant)
+    .map((scale) => `${AQI_SCALES[scale].name}: ${POLLUTANT_LABELS[air.aqi[scale].dominant]}`)
+    .join(' · ');
+
+  const airDetailRows = airError ? [
+    <ListItem key="air-error" divider>
+      <ListItemText primary="Air Quality" secondary={`Unavailable: ${airError.message}`} />
+    </ListItem>,
+  ] : air ? [
+    dominantValue && (
+      <ListItem key="air-dominant" divider>
+        <ListItemText primary="Main Pollutant" secondary={dominantValue} />
+      </ListItem>
+    ),
+    air.uvIndex != null && (
+      <ListItem key="uv" divider>
+        <ListItemText primary="UV Index" secondary={`${air.uvIndex} · ${uvLabel(air.uvIndex)}`} />
+      </ListItem>
+    ),
+    ...Object.entries(air.pollutants)
+      .filter(([, p]) => p)
+      .map(([key, p]) => (
+        <ListItem key={`pollutant-${key}`} divider>
+          <ListItemText
+            primary={POLLUTANT_LABELS[key]}
+            secondary={`${p.value} ${p.unit ?? ''} · US ${p.usAqi ?? '—'} · EU ${p.euAqi ?? '—'}`} />
+        </ListItem>
+      )),
+  ].filter(Boolean) : [];
+
   return (
     <Box sx={{ position: 'relative', margin: '8px 8px 0px 8px' }}>
       <Paper ref={panelRef} elevation={3} sx={{ position: 'relative', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
@@ -92,15 +180,9 @@ const WeatherDisplay = () => {
         </Typography>
         <List>
 
-          <ListItem key={"description"} divider>
-            <ListItemText primary={"Location"} secondary={data?.name} />
-          </ListItem>
-          <ListItem key={"conditions"} divider>
-            <ListItemText primary={"Conditions"} secondary={conditionsValue(data.weather?.[0])} />
-          </ListItem>
-          <ListItem key={"temp"} divider>
-            <ListItemText primary={"Temp (C)"} secondary={`${sigDigits(data.main.temp, 3)} · feels like ${sigDigits(data.main.feels_like, 3)}`} />
-          </ListItem>
+          {/* Collapsed shows the first 3 rows; expanding adds the rest */}
+          {showMore ? rows : rows.slice(0, 3)}
+          {showMore && airDetailRows}
           {showMore &&
             data?.main &&
             Object.keys(data.main)
