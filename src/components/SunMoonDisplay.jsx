@@ -152,6 +152,18 @@ const SunMoonDisplay = () => {
     </ListItem>,
   ];
 
+  const rows = [
+    ...(daytime ? [...sunRows, ...moonRows] : [...moonRows, ...sunRows]),
+    // The next phase is the least time-sensitive, so it always comes last
+    nextPhase && (
+      <ListItem key="moon-next" divider>
+        <ListItemText
+          primary={toLabelCase(nextPhase.name)}
+          secondary={`${MOON_PHASE_EMOJI[nextPhase.name] ?? ''} ${formatDate(nextPhase.time)}`} />
+      </ListItem>
+    ),
+  ].filter(Boolean);
+
   return (
     <Box sx={{ position: 'relative', margin: '8px 8px 0px 8px' }}>
       <Paper ref={panelRef} elevation={3} sx={{ position: 'relative', padding: 2, pb: 5, height: '300px', overflowY: showMore ? 'auto' : 'hidden' }}>
@@ -160,15 +172,8 @@ const SunMoonDisplay = () => {
         </Typography>
         <List>
 
-          {daytime ? [...sunRows, ...moonRows] : [...moonRows, ...sunRows]}
-          {/* The next phase is the least time-sensitive, so it always comes last */}
-          {nextPhase && (
-            <ListItem key="moon-next" divider>
-              <ListItemText
-                primary={toLabelCase(nextPhase.name)}
-                secondary={`${MOON_PHASE_EMOJI[nextPhase.name] ?? ''} ${formatDate(nextPhase.time)}`} />
-            </ListItem>
-          )}
+          {/* Collapsed shows the first 3 rows; expanding adds the rest */}
+          {showMore ? rows : rows.slice(0, 3)}
         </List>
       </Paper>
       <Box sx={{ position: 'absolute', bottom: 8, right: 8 }}>
