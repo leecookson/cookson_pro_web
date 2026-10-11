@@ -19,12 +19,30 @@ Status: **done**, **planned**, or blank for not started.
 | Meteor shower outlook | Static shower calendar + moon illumination | No live API; fits as a new object type in `/astro/tonight` | No | |
 | Sky darkness / light pollution | Light-pollution map data | Shows hiding a key behind the proxy | Usually | |
 
+## Time-oriented (not tied to location)
+
+| Idea | Source | Why it's a good demo | Key? | Status |
+|---|---|---|---|---|
+| People in space right now | Launch Library 2 + corquaid people-in-space feed | Two cached sources merged into a better result; partial failure falls back to one source | No | planned (`/space/people` done; card in progress) |
+| Hacker News top stories | HN Firebase API | Combining many calls into one: the proxy fetches the story IDs, then the top 10 stories in parallel | No | |
+| Upcoming rocket launches, with countdowns | Launch Library 2 | Respecting a rate limit (~15 requests/hour): server-side caching is what makes it usable | No | |
+| NASA Astronomy Picture of the Day | NASA APOD | Hiding a key; one cached copy a day serves every visitor | Yes (free) | |
+| On this day | Wikipedia "On this day" feed | Events, births and deaths for today's date; very easy | No | |
+| Sky calendar | `astronomy-engine` (already in the API) | Next eclipse, equinox/solstice, meteor shower peaks, planet events; no new external source | No | |
+| Space weather | NOAA SWPC | Solar flares and global Kp over the last 24 hours; leads into aurora alerts | No | |
+| Asteroids passing Earth this week | NASA NeoWs | Closest approach compared with the Moon's distance; a small chart | Yes (same as APOD) | |
+| Exchange rates | Frankfurter (ECB rates) | Daily update, 30-day sparkline; default currency from the Location card's country | No | |
+| Recent significant earthquakes | USGS feed | Worldwide over the last 24 hours, with relative times | No | |
+| Space news | Spaceflight News API | Latest headlines; pairs with launches | No | |
+| Today at a glance | None (computed) | Day of year, week number, % of the year gone, days to the next holiday | No | |
+
+Rejected: **Open Notify** (`astros.json`) for people in space. It's HTTP-only, which would have shown the proxy working around browser restrictions, but its crew list stopped updating in 2024.
+
 ## Patterns the site doesn't show yet
 
 - **Hiding secrets in the proxy:** a GitHub card (repos, recent commits) with the token kept server-side. Brings in rate-limit headers and pagination.
 - **Server-side caching you can see:** NASA APOD changes once a day; cache it at the proxy and show a cache-hit indicator.
 - **User input + debouncing:** city search (Nominatim or Open-Meteo geocoding) as a manual third tier of the location cascade, so visitors can look up weather and sky for anywhere.
-- **Countdowns and timers:** upcoming rocket launches (Launch Library 2).
 
 ## UX ideas
 
