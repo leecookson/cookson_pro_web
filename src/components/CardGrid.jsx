@@ -6,15 +6,16 @@ import AstroDisplay from './AstroDisplay';
 import WeatherDisplay from './WeatherDisplay';
 import SunMoonDisplay from './SunMoonDisplay';
 import NightSkyDisplay from './NightSkyDisplay';
+import PeopleInSpaceDisplay from './PeopleInSpaceDisplay';
 import GhostCard from './GhostCard';
 import CardErrorBoundary from './CardErrorBoundary';
 
-const CARDS = [LocationDisplay, WeatherDisplay, AstroDisplay, SunMoonDisplay, NightSkyDisplay];
+const CARDS = [LocationDisplay, WeatherDisplay, AstroDisplay, SunMoonDisplay, NightSkyDisplay, PeopleInSpaceDisplay];
 
-// 1 column on phones, 2 from sm, 3 from md, all 5 in one row from xl. Column
-// counts are explicit so the layout doesn't depend on card min-widths. The page
-// itself scrolls vertically.
-const COLUMNS = { xs: 1, sm: 2, md: 3, xl: 5 };
+// 1 column on phones, 2 from sm, 3 from md, 4 from xl, keeping cards roughly 370-490px
+// wide on large screens. Column counts are explicit so the layout doesn't depend on card
+// min-widths. The page itself scrolls vertically.
+const COLUMNS = { xs: 1, sm: 2, md: 3, xl: 4 };
 
 // Current column count, matching the gridTemplateColumns breakpoints
 const useColumnCount = () => {
