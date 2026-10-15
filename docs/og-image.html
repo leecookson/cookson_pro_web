@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!--
+  Source for public/og-image.png, the 1200x630 link-preview image referenced by the
+  og:image tag in public/index.html. To regenerate: open this file in Chrome with the
+  viewport at exactly 1200x630 (DevTools device toolbar, DPR 1) and capture a screenshot.
+  Colors match the site theme. After replacing the image, use a new filename or add its
+  path to the CloudFront invalidation in .github/workflows/deploy_to_s3.yml.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500&display=swap">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: rgb(50, 47, 46);
+    font-family: Roboto, Helvetica, Arial, sans-serif;
+    color: #fff;
+    position: relative;
+  }
+  svg.stars { position: absolute; inset: 0; }
+  .content { position: absolute; left: 96px; top: 150px; right: 96px; }
+  h1 { font-weight: 400; font-size: 96px; margin: 0; letter-spacing: -1px; }
+  h1 .star { color: rgb(180, 145, 110); }
+  p.tagline { font-weight: 300; font-size: 34px; margin: 18px 0 44px; color: rgba(255,255,255,0.88); }
+  .chips { display: flex; flex-wrap: wrap; gap: 14px; }
+  .chip {
+    background: rgb(180, 145, 110); color: rgb(33, 33, 33);
+    border-radius: 999px; padding: 10px 24px; font-size: 26px; font-weight: 500;
+  }
+  .footer {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 72px;
+    background: rgb(75, 72, 71); display: flex; align-items: center; padding: 0 96px;
+    font-size: 28px; color: rgba(255,255,255,0.92);
+  }
+</style>
+</head>
+<body>
+<svg class="stars" width="1200" height="630" id="stars"></svg>
+<div class="content">
+  <h1><span class="star">✦</span> CooksonPro</h1>
+  <p class="tagline">Live weather, sky and space data through a custom API proxy</p>
+  <div class="chips">
+    <span class="chip">Weather &amp; Air Quality</span>
+    <span class="chip">Sun &amp; Moon</span>
+    <span class="chip">Night Sky</span>
+    <span class="chip">People in Space</span>
+  </div>
+</div>
+<div class="footer">cookson.pro · Lee Cookson</div>
+<script>
+  // Deterministic faint star field, kept off the text block
+  let seed = 7;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const svg = document.getElementById('stars');
+  for (let i = 0; i < 160; i++) {
+    const x = rand() * 1200, y = rand() * 558;
+    const r = rand() < 0.08 ? 1.8 : rand() * 1.1 + 0.4;
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', r);
+    c.setAttribute('fill', '#fff'); c.setAttribute('opacity', (rand() * 0.5 + 0.15).toFixed(2));
+    svg.appendChild(c);
+  }
+</script>
+</body>
+</html>
