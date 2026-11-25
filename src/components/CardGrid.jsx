@@ -38,7 +38,9 @@ function CardGrid() {
       sx={{
         display: 'grid',
         gridTemplateColumns: Object.fromEntries(
-          Object.entries(COLUMNS).map(([bp, n]) => [bp, n === 1 ? '1fr' : `repeat(${n}, 1fr)`])
+          // minmax(0, 1fr) rather than 1fr: a plain 1fr column grows to fit content that can't
+          // wrap, which made one column wider than the others
+          Object.entries(COLUMNS).map(([bp, n]) => [bp, `repeat(${n}, minmax(0, 1fr))`])
         ),
         // Cards carry their own 8px side margins; add matching vertical spacing
         rowGap: 2,

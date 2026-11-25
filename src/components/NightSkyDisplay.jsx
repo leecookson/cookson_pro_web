@@ -57,13 +57,22 @@ const passValue = ({ start, peak, endsInShadow, durationSeconds }) => {
   return `${formatTime(start.time)} · ${toCompass(start.azimuth)} → ${Math.round(peak.altitude)}° ${toCompass(peak.azimuth)} · ${ending}, ${formatDuration(durationSeconds)}`;
 };
 
+// "7:13p – 6:44a" for the card title, where a full "7:13 PM – 6:44 AM" would wrap
+const formatCompact = (iso) =>
+  new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?([AP])M$/i, (_, p) => p.toLowerCase());
+
+// What to call the window in phrases like "up all night": a window to dawn is the whole night,
+// one to midnight (the API's default) only the evening
+const windowSpan = (viewWindow) => (viewWindow?.until === 'dawn' ? 'night' : 'evening');
+
 // "from 7:41 PM · highest 52° SSE · mag 0.2 in Cetus". start/end are clipped to the span the
 // API searched (opensAt to closesAt), so matching an edge means it's up when that span opens or
-// still up at midnight. Planets are searched from the window start, stars from nautical dusk.
-const sightingValue = ({ start, peak, end, magnitude, constellation }, opensAt, closesAt) => {
+// still up when it closes. Planets are searched over the whole window, stars from nautical dusk
+// to nautical dawn.
+const sightingValue = ({ start, peak, end, magnitude, constellation }, opensAt, closesAt, span) => {
   const upAtStart = start.time === opensAt;
   const upAtEnd = end.time === closesAt;
-  const when = upAtStart && upAtEnd ? 'up all evening'
+  const when = upAtStart && upAtEnd ? `up all ${span}`
     : upAtStart ? `until ${formatTime(end.time)}`
       : upAtEnd ? `from ${formatTime(start.time)}`
         : `${formatTime(start.time)} – ${formatTime(end.time)}`;
@@ -83,13 +92,19 @@ const visibleSummary = (names) => {
   return rest > 0 ? `${named} +${rest} more` : named;
 };
 
-// window.darkness/darkest are newer than the rest of the API; fall back to the sun's twilight times
+// "from 8:02 PM", or "8:02 PM – 5:30 AM" when the window runs to dawn and says when it ends
+const timeSpan = (from, until) => (until ? `${formatTime(from)} – ${formatTime(until)}` : `from ${formatTime(from)}`);
+
+// window.darkness/darkest are newer than the rest of the API; fall back to the sun's twilight times.
+// window.dawn is only there for a window that runs to dawn.
 const darkSkyValue = (viewWindow, sun) => {
   const fullyDark = viewWindow.darkness ? viewWindow.darkness.astronomical : sun.twilight?.astronomical?.end;
   const darkest = viewWindow.darkest ?? (fullyDark ? 'astronomical' : null);
-  if (darkest === 'astronomical' && fullyDark) return `Fully dark from ${formatTime(fullyDark)}`;
+  if (darkest === 'astronomical' && fullyDark) return `Fully dark ${timeSpan(fullyDark, viewWindow.dawn?.astronomical)}`;
   const nautical = viewWindow.darkness?.nautical;
-  return nautical ? `Never fully dark tonight · stars from ${formatTime(nautical)}` : 'Never fully dark tonight';
+  return nautical
+    ? `Never fully dark tonight · stars ${timeSpan(nautical, viewWindow.dawn?.nautical)}`
+    : 'Never fully dark tonight';
 };
 
 // "7p" for the hourly cloud bars
@@ -103,16 +118,18 @@ const SKY_LABEL = {
   cloudy: 'Cloudy',
 };
 
-// "Partly cloudy", or "Clear all evening" when cover hardly changes over the window
-const skyLabel = ({ sky, steady }) => {
+// "Partly cloudy", or "Clear all night" when cover hardly changes over the window
+const skyLabel = ({ sky, steady }, span) => {
   const label = SKY_LABEL[sky] ?? toLabelCase(sky);
-  return steady ? `${label} all evening` : label;
+  return steady ? `${label} all ${span}` : label;
 };
 
 // Whether the moon is up during the window, from the rise/set times the API returns.
 // The latest event at or before the window start says whether it is up at the start;
-// any events inside the window say when that changes. Returns null when it can't tell.
+// any events inside the window say when that changes. A window to dawn is long enough for
+// the moon to both rise and set in it. Returns null when it can't tell.
 const moonInWindow = (moon, viewWindow) => {
+  const span = windowSpan(viewWindow);
   const start = new Date(viewWindow.start);
   const end = new Date(viewWindow.end);
   const events = [
@@ -128,15 +145,17 @@ const moonInWindow = (moon, viewWindow) => {
     .sort((a, b) => a.date - b.date);
 
   const before = events.filter((e) => e.date <= start).pop();
-  const during = events.find((e) => e.date > start && e.date < end);
+  const during = events.filter((e) => e.date > start && e.date < end);
 
-  if (during) {
-    return { up: true, text: during.type === 'rise' ? `rises ${formatTime(during.time)}` : `sets ${formatTime(during.time)}` };
+  if (during.length) {
+    // "rises 9:40 PM", or "sets 1:20 AM, rises 11:05 PM" style when both happen
+    const text = during.map((e) => `${e.type === 'rise' ? 'rises' : 'sets'} ${formatTime(e.time)}`).join(', ');
+    return { up: true, text };
   }
   if (!before) return null;
   return before.type === 'rise'
-    ? { up: true, text: 'up all evening' }
-    : { up: false, text: 'Below horizon all evening' };
+    ? { up: true, text: `up all ${span}` }
+    : { up: false, text: `Below horizon all ${span}` };
 };
 
 // The phase only matters if the moon is up to light the sky
@@ -147,9 +166,9 @@ const moonValue = (moon, when) => {
 };
 
 // clearest is null when the cover is steady, so no hour stands out
-// "Partly cloudy · clearest 9:00 PM", or "Clear all evening"
-const cloudsValue = (summary) =>
-  summary.clearest ? `${skyLabel(summary)} · clearest ${formatTime(summary.clearest.time)}` : skyLabel(summary);
+// "Partly cloudy · clearest 9:00 PM", or "Clear all night"
+const cloudsValue = (summary, span) =>
+  summary.clearest ? `${skyLabel(summary, span)} · clearest ${formatTime(summary.clearest.time)}` : skyLabel(summary, span);
 
 // "12% avg (4–30%)"
 const coverValue = ({ meanCover, minCover, maxCover }) => `${meanCover}% avg (${minCover}–${maxCover}%)`;
@@ -167,10 +186,17 @@ const SectionHeading = ({ children }) => (
   </Typography>
 );
 
-const CloudBars = ({ hourly }) => (
+// Hour labels that fit under the bars; a window to dawn has more hours than that, so only
+// every other one is labelled (each bar still has its time in its tooltip)
+const MAX_HOUR_LABELS = 8;
+
+const CloudBars = ({ hourly }) => {
+  const labelEvery = Math.ceil(hourly.length / MAX_HOUR_LABELS);
+  return (
   <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.5, mt: 1 }}>
-    {hourly.map((h) => (
-      <Box key={h.time} title={`${formatTime(h.time)} · ${h.cover}% cloud`} sx={{ flex: 1, textAlign: 'center' }}>
+    {hourly.map((h, i) => (
+      // minWidth 0 lets the bars share the width however many there are
+      <Box key={h.time} title={`${formatTime(h.time)} · ${h.cover}% cloud`} sx={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
         <Box sx={{ height: 40, display: 'flex', alignItems: 'flex-end', bgcolor: 'action.hover', borderRadius: 0.5 }}>
           <Box
             sx={{
@@ -182,11 +208,15 @@ const CloudBars = ({ hourly }) => (
               borderRadius: 0.5,
             }} />
         </Box>
-        <Typography variant="caption" color="text.secondary">{formatHour(h.time)}</Typography>
+        {/* Unlabelled bars keep an empty line so all the bars stay aligned */}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+          {i % labelEvery === 0 ? formatHour(h.time) : ' '}
+        </Typography>
       </Box>
     ))}
   </Box>
-);
+  );
+};
 
 const NightSkyDisplay = () => {
   const {
@@ -231,6 +261,9 @@ const NightSkyDisplay = () => {
 
   const { status, reason, window: viewWindow, sun, moon, clouds, objects, unavailable } = data;
   const moonWhen = viewWindow && moonInWindow(moon, viewWindow);
+  const span = windowSpan(viewWindow);
+  // Stars are searched to nautical dawn, when they fade, if the window runs to dawn
+  const starsUntil = viewWindow?.dawn?.nautical ?? viewWindow?.end;
   // Kinds the card doesn't know yet are skipped
   const passes = (objects ?? [])
     .filter((o) => o.kind === 'satellite')
@@ -267,8 +300,10 @@ const NightSkyDisplay = () => {
           Night Sky
           {viewWindow && (
             <Typography component="span" variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
-              {/* The window always ends at local midnight */}
-              from {formatTime(viewWindow.start)}
+              {viewWindow.until === 'dawn'
+                ? `${formatCompact(viewWindow.start)} – ${formatCompact(viewWindow.end)}`
+                // A window to midnight (the API default) always ends there
+                : `from ${formatTime(viewWindow.start)}`}
             </Typography>
           )}
         </Typography>
@@ -277,7 +312,7 @@ const NightSkyDisplay = () => {
 
         {/* Three rows collapsed, like the other cards; expanding continues the same list */}
         <List>
-          {clouds && <Row label="Clouds" value={cloudsValue(clouds.summary)} />}
+          {clouds && <Row label="Clouds" value={cloudsValue(clouds.summary, span)} />}
           {status === 'ok' && !clouds && (
             <Row label="Clouds" value={unavailable?.clouds ?? 'Not available'} />
           )}
@@ -290,7 +325,7 @@ const NightSkyDisplay = () => {
                 <Row
                   key={p.id}
                   label={p.name}
-                  value={sightingValue(p, viewWindow.start, viewWindow.end)}
+                  value={sightingValue(p, viewWindow.start, viewWindow.end, span)}
                   action={showInSky(p)} />
               ))}
               {passes.map((p) => (
@@ -307,13 +342,15 @@ const NightSkyDisplay = () => {
           <>
             {stars.length > 0 && (
               <>
-                <SectionHeading>Bright stars · from {formatTime(viewWindow.darkness.nautical)}</SectionHeading>
+                <SectionHeading>
+                  Bright stars · {timeSpan(viewWindow.darkness.nautical, viewWindow.dawn?.nautical)}
+                </SectionHeading>
                 <List>
                   {stars.map((s) => (
                     <Row
                       key={s.id}
                       label={s.name}
-                      value={sightingValue(s, viewWindow.darkness.nautical, viewWindow.end)}
+                      value={sightingValue(s, viewWindow.darkness.nautical, starsUntil, span)}
                       action={showInSky(s)} />
                   ))}
                 </List>

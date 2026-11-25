@@ -54,13 +54,13 @@ export const fetchSunMoon = async (latitude, longitude) => {
 
 /**
  * Fetches tonight's stargazing conditions (viewing window, cloud forecast, sun and moon)
- * for today's evening in the browser's time zone.
+ * for today's evening in the browser's time zone, from dusk to dawn.
  * See cookson_pro_api/docs/api-astro-tonight.md for the response shape.
  */
 export const fetchTonight = async (latitude, longitude) => {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const date = new Date().toLocaleDateString('en-CA', { timeZone: tz }); // en-CA formats as YYYY-MM-DD
-  const params = new URLSearchParams({ date, tz });
+  const params = new URLSearchParams({ date, tz, until: 'dawn' });
   let url = `/api/v1/astro/tonight/${latitude}/${longitude}?${params}`;
   console.log(`[Astro API] Fetching tonight data from ${url}`);
   const response = await fetch(url);
